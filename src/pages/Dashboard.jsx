@@ -52,7 +52,7 @@ export default function Dashboard() {
       : [];
 
     setIncidents(incidentData);
-  } catch (err) {
+  } catch {
     setError("Failed to load incidents");
   } finally {
     setLoading(false);
@@ -117,40 +117,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  const handleDelete = async (id) => {
-    try {
-      const token = localStorage.getItem("token");
-
-      await axios.delete(`http://localhost:5000/incidents/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setIncidents((prev) =>
-        prev.filter((i) => (i.id || i.incident_id) !== id)
-      );
-    } catch (err) {
-      console.error("Delete failed:", err);
-    }
-  };
-
-  const handleEdit = async (id, title, status) => {
-    try {
-      const token = localStorage.getItem("token");
-
-      const res = await axios.put(
-        `http://localhost:5000/incidents/${id}`,
-        { title, status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setIncidents((prev) =>
-        prev.map((i) => ((i.id || i.incident_id) === id ? res.data : i))
-      );
-    } catch (err) {
-      console.error("Update failed:", err);
-    }
-  };
-
   if (loading) {
     return (
       <div style={styles.center}>
@@ -170,18 +136,15 @@ export default function Dashboard() {
   const normalise = (value) => (value || "").toLowerCase();
 
   const ipCounts = incidents.reduce((acc, incident) => {
-  const ip = incident.source_ip || "Unknown";
-  acc[ip] = (acc[ip] || 0) + 1;
-  return acc;
-}, {});
+    if (!incident.source_ip) return acc;
 
-const topIP =
-  Object.entries(ipCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ||
-  "N/A";
-const mostActiveIP =
-  Object.keys(topIP).length > 0
-    ? Object.entries(topIP).sort((a, b) => b[1] - a[1])[0][0]
-    : "N/A";
+    acc[incident.source_ip] = (acc[incident.source_ip] || 0) + 1;
+    return acc;
+  }, {});
+
+  const topIPEntry = Object.entries(ipCounts).sort((a, b) => b[1] - a[1])[0];
+  const topIP = topIPEntry?.[0] || "No source IP";
+  const topIPCount = topIPEntry?.[1] || 0;
 
 const stats = {
   total: incidents.length,
@@ -283,14 +246,12 @@ const topAttackTypes = Object.entries(attackTypeCounts)
     Top Source IP
   </div>
 
-  <div
-    style={{
-      fontSize: "28px",
-      fontWeight: "700",
-      marginTop: "8px",
-    }}
-  >
+  <div style={styles.topSourceValue}>
     {topIP}
+  </div>
+
+  <div style={styles.topSourceMeta}>
+    {topIPCount > 0 ? `${topIPCount} incidents` : "Add source_ip to incidents"}
   </div>
 </div>
     </div>
@@ -449,13 +410,13 @@ const topAttackTypes = Object.entries(attackTypeCounts)
 }
 const styles = {
  page: {
-  padding: "12px 16px",
+  padding: "10px 12px",
   background: "#0f172a",
   minHeight: "100vh",
 },
 
 title: {
-  marginBottom: "10px",
+  marginBottom: "8px",
   color: "#f9fafb",
   fontSize: "22px",
   fontWeight: "600",
@@ -473,18 +434,18 @@ title: {
 
   statsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "12px",
-    marginBottom: "25px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+    gap: "10px",
+    marginBottom: "18px",
   },
 
   statCard: {
     background: "#111827",
     color: "#f9fafb",
-    padding: "12px",
+    padding: "10px",
     borderRadius: "12px",
     fontWeight: "bold",
-    fontSize: "16x",
+    fontSize: "13px",
     border: "1px solid #1e293b",
     boxShadow: "0 0 12px rgba(59,130,246,0.15)",
   },
@@ -648,6 +609,21 @@ statValue: {
   fontSize: "18px",
   color: "#f8fafc",
   fontWeight: "700",
+},
+
+topSourceValue: {
+  fontSize: "18px",
+  fontWeight: "700",
+  marginTop: "8px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+},
+
+topSourceMeta: {
+  marginTop: "6px",
+  color: "#94a3b8",
+  fontSize: "12px",
 },
 
 

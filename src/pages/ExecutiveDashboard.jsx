@@ -37,6 +37,9 @@ const isExternalIP = (ip) => {
   );
 };
 
+const isExternalCountry = (country) =>
+  country && country !== "Localhost" && country !== "Unknown";
+
 const getSeverityColor = (severity) => {
   const value = String(severity || "").toLowerCase();
 
@@ -48,22 +51,29 @@ const getSeverityColor = (severity) => {
 
 export default function ExecutiveDashboard() {
   const [incidents, setIncidents] = useState([]);
+  const [countryStats, setCountryStats] = useState({});
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const getAuthHeaders = useCallback(() => {
+    const token = localStorage.getItem("token");
+
+    return {
+      Authorization: `Bearer ${token}`,
+    };
+  }, []);
 
   const loadIncidents = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token");
-
       const res = await axios.get("http://localhost:5000/incidents", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       setIncidents(Array.isArray(res.data) ? res.data : []);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error("Failed to load executive dashboard:", err);
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -76,8 +86,6 @@ export default function ExecutiveDashboard() {
   const closed = incidents.filter((i) => i.status === "closed").length;
   const critical = incidents.filter((i) => i.severity === "critical").length;
   const high = incidents.filter((i) => i.severity === "high").length;
-  const medium = incidents.filter((i) => i.severity === "medium").length;
-
   const uniqueIPs = new Set(
     incidents.map((i) => i.source_ip).filter(Boolean)
   ).size;
@@ -94,24 +102,27 @@ export default function ExecutiveDashboard() {
     (i) => i.severity === "critical" && i.status !== "closed"
   ).length;
 
-  const riskScore = Math.max(
-    0,
-    Math.min(100, critical * 18 + high * 10 + medium * 4 + open * 2)
+  const attackSources = uniqueIPs;
+  const securityScore = Math.round(
+    Math.max(
+      0,
+      100 - critical * 4 - high * 2 - open * 0.5 - attackSources * 2
+    )
   );
 
   const posture =
-    riskScore >= 70
-      ? "High Risk"
-      : riskScore >= 40
+    securityScore >= 75
+      ? "Low Risk"
+      : securityScore >= 50
       ? "Medium Risk"
-      : "Healthy";
+      : "High Risk";
 
   const postureColor =
-    riskScore >= 70
-      ? "#dc2626"
-      : riskScore >= 40
+    securityScore >= 75
+      ? "#22c55e"
+      : securityScore >= 50
       ? "#f97316"
-      : "#22c55e";
+      : "#dc2626";
 
   const topRisks = incidents
     .filter((i) => i.severity === "critical" || i.severity === "high")
@@ -138,12 +149,99 @@ export default function ExecutiveDashboard() {
     [incidents]
   );
 
-  const recommendedAction =
-    criticalOpenCases > 0
-      ? "Investigate critical incidents and review external attack sources."
+  const recommendation =
+    critical > 5
+      ? {
+          title: "Immediate priority",
+          action: "Investigate critical incidents and review external attack sources.",
+        }
+      : critical === 0 && closed > open
+      ? {
+          title: "Security posture improving",
+          action: "Closed cases exceed open cases. Continue monitoring and validate controls.",
+        }
+      : critical === 0
+      ? {
+          title: "Monitor environment",
+          action: "No critical incidents detected. Maintain routine monitoring and response readiness.",
+        }
       : high > 0
-      ? "Prioritize high-severity incidents and validate containment actions."
-      : "Continue monitoring and maintain routine incident review.";
+      ? {
+          title: "Prioritize high severity",
+          action: "Prioritize high-severity incidents and validate containment actions.",
+        }
+      : {
+          title: "Monitor environment",
+          action: "Continue monitoring and maintain routine incident review.",
+        };
+
+  const topAttackCountry =
+    Object.entries(countryStats).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+    "No GeoIP data";
+
+  const threatTrend =
+    criticalOpenCases > 0 || critical + high > closed
+      ? "Threat Activity: Increasing"
+      : open > closed
+      ? "Open Cases: Increasing"
+      : "Threat Activity: Stable";
+
+  const lastUpdatedLabel = lastUpdated
+    ? lastUpdated.toLocaleString("en-AU", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : "Not updated";
+
+  useEffect(() => {
+    const loadCountryStats = async () => {
+      const sourceIPs = [
+        ...new Set(incidents.map((i) => i.source_ip).filter(isExternalIP)),
+      ];
+
+      if (sourceIPs.length === 0) {
+        setCountryStats({});
+        return;
+      }
+
+      try {
+        const geoResults = await Promise.all(
+          sourceIPs.map(async (ip) => {
+            const res = await axios.get(`http://localhost:5000/geoip/${ip}`, {
+              headers: getAuthHeaders(),
+            });
+
+            return res.data;
+          })
+        );
+
+        const ipToCountry = geoResults.reduce((acc, geo) => {
+          const ip = geo.ip || geo.query;
+          if (ip && isExternalCountry(geo.country)) {
+            acc[ip] = geo.country;
+          }
+          return acc;
+        }, {});
+
+        const nextCountryStats = incidents.reduce((acc, incident) => {
+          const country = ipToCountry[incident.source_ip];
+          if (!country) return acc;
+
+          acc[country] = (acc[country] || 0) + 1;
+          return acc;
+        }, {});
+
+        setCountryStats(nextCountryStats);
+      } catch (err) {
+        console.error("Failed to load executive country stats:", err);
+      }
+    };
+
+    loadCountryStats();
+  }, [getAuthHeaders, incidents]);
 
   return (
     <div style={styles.page}>
@@ -151,54 +249,78 @@ export default function ExecutiveDashboard() {
         High-level security posture, business risk, and active threat overview.
       </p>
 
+      <p style={styles.lastUpdated}>Last Updated: {lastUpdatedLabel}</p>
+
       <div style={{ ...styles.scoreCard, borderColor: postureColor }}>
-        <div>
-          <p style={styles.sectionLabel}>Risk Score</p>
-          <h1 style={{ ...styles.scoreValue, color: postureColor }}>
-            {riskScore}/100
-          </h1>
+        <div style={styles.scoreContent}>
+          <p style={styles.sectionLabel}>Security Posture</p>
+          <div style={styles.scoreSummary}>
+            <h1 style={{ ...styles.scoreValue, color: postureColor }}>
+              {securityScore}%
+            </h1>
+            <span style={{ ...styles.scoreTextBadge, color: postureColor }}>
+              {posture}
+            </span>
+          </div>
+
+          <div style={styles.scoreBar}>
+            <div
+              style={{
+                ...styles.scoreBarFill,
+                width: `${securityScore}%`,
+                background: postureColor,
+              }}
+            />
+          </div>
         </div>
 
-        <div style={{ ...styles.postureBadge, background: postureColor }}>
-          {posture}
+        <div style={styles.scoreMeta}>
+          <span>0</span>
+          <span>100</span>
         </div>
       </div>
 
       <div style={styles.statsGrid}>
         <div style={styles.card}>
-          <h2>{total}</h2>
-          <p>Total Incidents</p>
+          <p style={styles.cardLabel}>Total Incidents</p>
+          <h2 style={styles.cardValue}>{total}</h2>
         </div>
 
         <div style={styles.card}>
-          <h2>{open}</h2>
-          <p>Open</p>
+          <p style={styles.cardLabel}>Open</p>
+          <h2 style={styles.cardValue}>{open}</h2>
         </div>
 
         <div style={styles.card}>
-          <h2>{inProgress}</h2>
-          <p>In Progress</p>
+          <p style={styles.cardLabel}>In Progress</p>
+          <h2 style={styles.cardValue}>{inProgress}</h2>
         </div>
 
         <div style={styles.card}>
-          <h2>{closed}</h2>
-          <p>Closed</p>
+          <p style={styles.cardLabel}>Closed</p>
+          <h2 style={styles.cardValue}>{closed}</h2>
         </div>
 
         <div style={styles.card}>
-          <h2>{critical}</h2>
-          <p>Critical Threats</p>
+          <p style={styles.cardLabel}>Critical Threats</p>
+          <h2 style={styles.cardValue}>{critical}</h2>
         </div>
 
         <div style={styles.card}>
-          <h2>{high}</h2>
-          <p>High Threats</p>
+          <p style={styles.cardLabel}>High Threats</p>
+          <h2 style={styles.cardValue}>{high}</h2>
         </div>
 
         <div style={styles.card}>
-          <h2>{uniqueIPs}</h2>
-          <p>Attack Sources</p>
+          <p style={styles.cardLabel}>Attack Sources</p>
+          <h2 style={styles.cardValue}>{uniqueIPs}</h2>
         </div>
+
+        <div style={styles.card}>
+          <p style={styles.cardLabel}>Top Attack Country</p>
+          <h2 style={styles.cardTextValue}>{topAttackCountry}</h2>
+        </div>
+
       </div>
 
       <div style={styles.grid}>
@@ -207,9 +329,17 @@ export default function ExecutiveDashboard() {
 
           {topRisks.length > 0 ? (
             topRisks.map((risk) => (
-              <div key={risk.id || risk.incident_id} style={styles.riskItem}>
-                <div>
-                  <strong>{risk.title}</strong>
+              <div
+                key={risk.id || risk.incident_id}
+                style={{
+                  ...styles.riskItem,
+                  borderLeft: `5px solid ${getSeverityColor(risk.severity)}`,
+                }}
+              >
+                <div style={styles.riskText}>
+                  <strong style={styles.riskTitle} title={risk.title}>
+                    {risk.title}
+                  </strong>
                   <p>{risk.status || "open"}</p>
                 </div>
 
@@ -234,9 +364,9 @@ export default function ExecutiveDashboard() {
           {mitreCoverage.length > 0 ? (
             mitreCoverage.map((technique) => (
               <div key={technique.id} style={styles.mitreItem}>
-                <strong style={styles.mitreTechnique}>
+                <span style={styles.mitreTechnique}>
                   {technique.id} - {technique.name}
-                </strong>
+                </span>
 
                 <span style={styles.mitreCount}>
                   {technique.count} incidents
@@ -272,12 +402,9 @@ export default function ExecutiveDashboard() {
 
         <div style={styles.recommendationBox}>
           <p style={styles.sectionLabel}>Executive Recommendation</p>
-          <h3>Immediate priority</h3>
-          <p>
-            {criticalOpenCases > 0
-              ? "Investigate critical incidents and review external attack sources."
-              : recommendedAction}
-          </p>
+          <h3>{recommendation.title}</h3>
+          <div style={styles.trendBadge}>{threatTrend}</div>
+          <p>{recommendation.action}</p>
         </div>
       </div>
     </div>
@@ -294,7 +421,13 @@ const styles = {
 
   subtitle: {
     color: "#94a3b8",
-    marginBottom: "16px",
+    marginBottom: "6px",
+  },
+
+  lastUpdated: {
+    color: "#cbd5e1",
+    fontSize: "13px",
+    margin: "0 0 16px",
   },
 
   scoreCard: {
@@ -304,9 +437,21 @@ const styles = {
     padding: "16px 18px",
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-end",
     gap: "16px",
     marginBottom: "16px",
+  },
+
+  scoreContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  scoreSummary: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "12px",
+    marginTop: "6px",
   },
 
   sectionLabel: {
@@ -318,18 +463,38 @@ const styles = {
   },
 
   scoreValue: {
-    margin: "6px 0 0",
+    margin: 0,
     fontSize: "38px",
     lineHeight: 1,
   },
 
-  postureBadge: {
-    color: "#fff",
-    borderRadius: "999px",
-    padding: "8px 14px",
-    fontSize: "13px",
+  scoreTextBadge: {
+    fontSize: "14px",
     fontWeight: "800",
     textTransform: "uppercase",
+  },
+
+  scoreBar: {
+    height: "12px",
+    marginTop: "14px",
+    background: "#1e293b",
+    border: "1px solid #334155",
+    borderRadius: "999px",
+    overflow: "hidden",
+  },
+
+  scoreBarFill: {
+    height: "100%",
+    borderRadius: "999px",
+  },
+
+  scoreMeta: {
+    width: "72px",
+    display: "flex",
+    justifyContent: "space-between",
+    color: "#94a3b8",
+    fontSize: "12px",
+    fontWeight: "700",
   },
 
   statsGrid: {
@@ -341,7 +506,7 @@ const styles = {
 
   grid: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
     gap: "16px",
     marginBottom: "16px",
   },
@@ -349,10 +514,36 @@ const styles = {
   card: {
     background: "#111827",
     border: "1px solid #334155",
-    borderRadius: "10px",
-    padding: "12px",
+    borderRadius: "12px",
+    padding: "18px",
     textAlign: "center",
-    minHeight: "76px",
+    minHeight: "120px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  cardLabel: {
+    margin: 0,
+    color: "#94a3b8",
+    fontSize: "14px",
+    fontWeight: "700",
+  },
+
+  cardValue: {
+    margin: "10px 0 0",
+    fontSize: "34px",
+    lineHeight: 1,
+  },
+
+  cardTextValue: {
+    margin: "10px 0 0",
+    fontSize: "17px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "100%",
   },
 
   panel: {
@@ -360,6 +551,8 @@ const styles = {
     border: "1px solid #334155",
     borderRadius: "12px",
     padding: "16px",
+    minWidth: 0,
+    overflow: "hidden",
   },
 
   panelTitle: {
@@ -380,28 +573,34 @@ const styles = {
 
   mitreItem: {
     marginTop: "10px",
-    padding: "11px",
+    padding: "9px 10px",
     background: "#1e293b",
     borderRadius: "8px",
     border: "1px solid #475569",
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
-    gap: "16px",
+    alignItems: "flex-start",
+    gap: "10px",
     textAlign: "left",
+    minWidth: 0,
   },
 
   mitreTechnique: {
     minWidth: 0,
     overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    lineHeight: 1.35,
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#f8fafc",
   },
 
   mitreCount: {
     flexShrink: 0,
     color: "#cbd5e1",
-    fontSize: "13px",
+    fontSize: "12px",
     fontWeight: "700",
     whiteSpace: "nowrap",
   },
@@ -417,6 +616,18 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     textAlign: "left",
+  },
+
+  riskText: {
+    minWidth: 0,
+    flex: 1,
+  },
+
+  riskTitle: {
+    display: "block",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
 
   severityBadge: {
@@ -435,6 +646,18 @@ const styles = {
     borderRadius: "12px",
     padding: "16px",
     boxShadow: "0 0 14px rgba(56, 189, 248, 0.16)",
+  },
+
+  trendBadge: {
+    display: "inline-flex",
+    margin: "4px 0 12px",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    background: "rgba(248, 113, 113, 0.14)",
+    border: "1px solid rgba(248, 113, 113, 0.35)",
+    color: "#fecaca",
+    fontSize: "12px",
+    fontWeight: "800",
   },
 
   emptyText: {

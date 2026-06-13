@@ -1,4 +1,6 @@
+import { useCallback, useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
 import socket from "../pages/socket";
 import cveLogo from "../assets/cve.png";
 import mitreLogo from "../assets/mitre.png";
@@ -7,6 +9,49 @@ import cisaLogo from "../assets/cisa.png";
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [sidebarStats, setSidebarStats] = useState({
+    incidents: 0,
+    critical: 0,
+  });
+
+  const loadSidebarStats = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) return;
+
+      const res = await axios.get("http://localhost:5000/incidents", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const incidents = Array.isArray(res.data) ? res.data : [];
+
+      setSidebarStats({
+        incidents: incidents.length,
+        critical: incidents.filter((incident) => incident.severity === "critical")
+          .length,
+      });
+    } catch (err) {
+      console.error("Failed to load sidebar stats:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSidebarStats();
+
+    socket.on("incident-created", loadSidebarStats);
+    socket.on("incident-updated", loadSidebarStats);
+    socket.on("incident-deleted", loadSidebarStats);
+
+    return () => {
+      socket.off("incident-created", loadSidebarStats);
+      socket.off("incident-updated", loadSidebarStats);
+      socket.off("incident-deleted", loadSidebarStats);
+    };
+  }, [loadSidebarStats]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -45,8 +90,8 @@ export default function Layout() {
     ● Online
   </div>
   <div style={styles.userStats}>
-    <span>Incidents: 6</span>
-    <span>Critical: 3</span>
+    <span>Incidents: {sidebarStats.incidents}</span>
+    <span>Critical: {sidebarStats.critical}</span>
   </div>
 </div>
 
@@ -164,7 +209,7 @@ export default function Layout() {
        <h2
   style={{
     margin: 0,
-    fontSize: "36px",
+    fontSize: "28px",
     fontWeight: "700",
     color: "#f8fafc",
   }}
@@ -196,10 +241,10 @@ const styles = {
   },
 
  sidebar: {
-  width: "260px",
+  width: "240px",
   background: "#0b1220",
   color: "#fff",
-  padding: "16px 12px",
+  padding: "14px 10px",
   display: "flex",
   flexDirection: "column",
   gap: "6px",
@@ -207,20 +252,20 @@ const styles = {
 },
 
   logo: {
-    marginBottom: "18px",
-    fontSize: "18px",
+    marginBottom: "14px",
+    fontSize: "16px",
     fontWeight: "bold",
     textAlign: "center",
   },
 
  link: {
-  padding: "8px 10px",
+  padding: "7px 10px",
   border: "none",
   borderRadius: "8px",
   cursor: "pointer",
   textAlign: "left",
   fontWeight: "500",
-  fontSize: "14px",
+  fontSize: "13px",
 },
   logout: {
     marginTop: "auto",
@@ -241,12 +286,12 @@ const styles = {
   },
 
  topbar: {
-  padding: "15px 20px",
+  padding: "12px 18px",
   borderBottom: "1px solid #1e293b",
   background: "#0b1220",
 },
   content: {
-    padding: "12px",
+    padding: "10px",
     width: "100%",
     boxSizing: "border-box",
   },
@@ -306,7 +351,7 @@ userPanel: {
 
 userRole: {
   color: "#38bdf8",
-  fontSize: "15px",
+  fontSize: "13px",
   fontWeight: "700",
   marginBottom: "6px",
 },
