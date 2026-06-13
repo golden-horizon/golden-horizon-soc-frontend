@@ -119,6 +119,65 @@ code {
   animation: pulseThreat 1.5s infinite;
 }
 
+.soc-kpi-card,
+.soc-incident-row,
+.soc-action-button,
+.soc-nav-link,
+.soc-resource-link {
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+
+.soc-kpi-card:hover {
+  border-color: #3b82f6 !important;
+  background: #0f1a33 !important;
+}
+
+.soc-incident-row:hover {
+  background: rgba(59, 130, 246, 0.08) !important;
+  border-color: #3b82f6 !important;
+}
+
+.soc-action-button:hover {
+  transform: translateY(-1px);
+  border-color: #3b82f6 !important;
+}
+
+.soc-nav-link:hover {
+  background: rgba(99, 102, 241, 0.15) !important;
+}
+
+.soc-resource-link:hover {
+  transform: translateY(-2px);
+  border-color: #3b82f6 !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.22);
+}
+
+.soc-top-source-card {
+  grid-column: span 4;
+}
+
+@media (max-width: 1200px) {
+  .soc-top-source-card {
+    grid-column: span 3;
+  }
+}
+
+@media (max-width: 900px) {
+  .soc-top-source-card {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .soc-top-source-card {
+    grid-column: span 1;
+  }
+}
+
 @keyframes dashMove {
   from {
     stroke-dashoffset: 0;

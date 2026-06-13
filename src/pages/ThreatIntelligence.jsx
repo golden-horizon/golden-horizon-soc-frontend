@@ -261,11 +261,11 @@ const styles = {
     background: "#0f172a",
     color: "#f8fafc",
     minHeight: "100vh",
-    padding: "30px",
+    padding: "16px",
   },
 
   title: {
-    fontSize: "34px",
+    fontSize: "24px",
     marginBottom: "8px",
   },
 
@@ -277,15 +277,15 @@ const styles = {
   statsGrid: {
   display: "grid",
   gridTemplateColumns: "repeat(4, 1fr)",
-  gap: "14px",
-  marginBottom: "18px",
+  gap: "10px",
+  marginBottom: "14px",
 },
 
   grid: {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
-  gap: "20px",
-  marginBottom: "20px",
+  gap: "14px",
+  marginBottom: "14px",
   alignItems: "start",
 },
 
@@ -293,9 +293,9 @@ card: {
   background: "#111827",
   border: "1px solid #334155",
   borderRadius: "12px",
-  padding: "12px",
+  padding: "10px",
   textAlign: "center",
-  minHeight: "95px",
+  minHeight: "76px",
   display: "flex",
   flexDirection: "column",
   justifyContent: "center",
@@ -304,13 +304,13 @@ panel: {
   background: "#111827",
   border: "1px solid #334155",
   borderRadius: "12px",
-  padding: "16px",
-  marginBottom: "16px",
+  padding: "12px",
+  marginBottom: "12px",
   alignSelf: "start",
 },
   item: {
     marginTop: "10px",
-    padding: "12px",
+    padding: "9px",
     background: "#1e293b",
     borderRadius: "8px",
     border: "1px solid #475569",

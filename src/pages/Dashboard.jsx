@@ -213,12 +213,12 @@ const topAttackTypes = Object.entries(attackTypeCounts)
   const getSeverityStyle = (severity) => {
     const s = normalise(severity);
 
-    if (s === "critical") return { background: "#991b1b" };
-    if (s === "high") return { background: "#ef4444" };
-    if (s === "medium") return { background: "#f59e0b" };
-    if (s === "low") return { background: "#22c55e" };
+    if (s === "critical") return { borderColor: "#ef4444", color: "#fecaca" };
+    if (s === "high") return { borderColor: "#f97316", color: "#fed7aa" };
+    if (s === "medium") return { borderColor: "#eab308", color: "#fef08a" };
+    if (s === "low") return { borderColor: "#22c55e", color: "#bbf7d0" };
 
-    return { background: "#6b7280" };
+    return { borderColor: "#64748b", color: "#cbd5e1" };
   };
 
   const formatDate = (date) => {
@@ -233,18 +233,39 @@ const topAttackTypes = Object.entries(attackTypeCounts)
 </h2>
 
     <div style={styles.statsGrid}>
-      <div style={styles.statCard}>Total: {stats.total}</div>
-      <div style={styles.statCard}>Open: {stats.open}</div>
-      <div style={styles.statCard}>In Progress: {stats.inProgress}</div>
-      <div style={styles.statCard}>Closed: {stats.closed}</div>
-      <div style={styles.criticalCard}>Critical: {stats.critical}</div>
-      <div style={styles.highCard}>High: {stats.high}</div>
+      <div className="soc-kpi-card" style={styles.statCard}>
+        <span style={styles.statLabel}>Total Incidents</span>
+        <strong style={styles.statValue}>{stats.total}</strong>
+      </div>
+
+      <div className="soc-kpi-card" style={styles.statCard}>
+        <span style={styles.statLabel}>Open</span>
+        <strong style={styles.statValue}>{stats.open}</strong>
+      </div>
+
+      <div className="soc-kpi-card" style={styles.statCard}>
+        <span style={styles.statLabel}>In Progress</span>
+        <strong style={styles.statValue}>{stats.inProgress}</strong>
+      </div>
+
+      <div className="soc-kpi-card" style={styles.statCard}>
+        <span style={styles.statLabel}>Closed</span>
+        <strong style={styles.statValue}>{stats.closed}</strong>
+      </div>
+
+      <div className="soc-kpi-card" style={{ ...styles.statCard, borderLeft: "3px solid #ef4444" }}>
+        <span style={styles.statLabel}>Critical</span>
+        <strong style={styles.statValue}>{stats.critical}</strong>
+      </div>
+
+      <div className="soc-kpi-card" style={{ ...styles.statCard, borderLeft: "3px solid #f97316" }}>
+        <span style={styles.statLabel}>High</span>
+        <strong style={styles.statValue}>{stats.high}</strong>
+      </div>
 
 
-<div style={styles.statCard}>
-  <div style={{ fontSize: "13px", color: "#94a3b8" }}>
-    Top Source IP
-  </div>
+<div className="soc-kpi-card soc-top-source-card" style={styles.statCard}>
+  <span style={styles.statLabel}>Top Source IP</span>
 
   <div style={styles.topSourceValue}>
     {topIP}
@@ -259,16 +280,43 @@ const topAttackTypes = Object.entries(attackTypeCounts)
     <div style={styles.chartGrid}>
       <div style={styles.chartBox}>
         <h3 style={styles.panelTitle}>Status Distribution</h3>
-        <ResponsiveContainer width="100%" height={150}>
-          <PieChart>
-            <Pie data={statusData} dataKey="value" outerRadius={55} label>
-              {statusData.map((_, i) => (
-                <Cell key={i} fill={statusColors[i]} />
-              ))}
-            </Pie>
-            <Tooltip />
-          </PieChart>
-        </ResponsiveContainer>
+        <div style={styles.donutWrap}>
+          <ResponsiveContainer width="100%" height={230}>
+            <PieChart>
+              <Pie
+                data={statusData}
+                dataKey="value"
+                innerRadius={70}
+                outerRadius={105}
+                label={false}
+              >
+                {statusData.map((_, i) => (
+                  <Cell key={i} fill={statusColors[i]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+
+          <div style={styles.donutCenter}>
+            <strong>{stats.open}</strong>
+            <span>Open</span>
+          </div>
+        </div>
+
+        <div style={styles.statusLegend}>
+          {statusData.map((item, index) => (
+            <div key={item.name} style={styles.statusLegendItem}>
+              <span
+                style={{
+                  ...styles.statusLegendDot,
+                  borderColor: statusColors[index],
+                }}
+              />
+              <span>{item.name} ({item.value})</span>
+            </div>
+          ))}
+        </div>
       </div>
 
 
@@ -350,6 +398,7 @@ const topAttackTypes = Object.entries(attackTypeCounts)
     <div style={styles.filters}>
       {["all", "critical", "high", "open", "closed"].map((f) => (
         <button
+          className="soc-action-button"
           key={f}
           onClick={() => setFilter(f)}
           style={{
@@ -372,6 +421,7 @@ const topAttackTypes = Object.entries(attackTypeCounts)
 
         return (
           <div
+  className="soc-incident-row"
   key={id}
   style={{
   ...styles.card,
@@ -390,7 +440,8 @@ const topAttackTypes = Object.entries(attackTypeCounts)
 
             <div style={styles.incidentDesc}>{i.description}</div>
 
-            <span style={{ ...styles.badge, ...getSeverityStyle(i.severity) }}>
+            <span style={{ ...styles.severityIndicator, ...getSeverityStyle(i.severity) }}>
+              <span style={{ ...styles.severityRing, ...getSeverityStyle(i.severity) }} />
               {i.severity || "low"}
             </span>
 
@@ -418,7 +469,7 @@ const styles = {
 title: {
   marginBottom: "8px",
   color: "#f9fafb",
-  fontSize: "22px",
+  fontSize: "20px",
   fontWeight: "600",
 },
 
@@ -442,66 +493,115 @@ title: {
   statCard: {
     background: "#111827",
     color: "#f9fafb",
-    padding: "10px",
-    borderRadius: "12px",
-    fontWeight: "bold",
-    fontSize: "13px",
-    border: "1px solid #1e293b",
-    boxShadow: "0 0 12px rgba(59,130,246,0.15)",
+    padding: "10px 12px",
+    borderRadius: "8px",
+    border: "1px solid #263244",
+    boxShadow: "0 1px 2px rgba(0,0,0,0.24)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    minHeight: "62px",
   },
 
   criticalCard: {
-  background: "#7f1d1d",
-  color: "#fff",
-  padding: "15px",
-  borderRadius: "12px",
+  background: "#111827",
+  color: "#f9fafb",
+  padding: "12px",
+  borderRadius: "8px",
   fontWeight: "bold",
-  fontSize: "18px",
-  border: "1px solid #ef4444",
-  boxShadow: "0 0 18px rgba(239,68,68,0.5)",
+  fontSize: "14px",
+  border: "1px solid #263244",
+  borderLeft: "3px solid #ef4444",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.24)",
 },
 
   highCard: {
-  background: "#991b1b",
-  color: "#fff",
-  padding: "15px",
-  borderRadius: "12px",
+  background: "#111827",
+  color: "#f9fafb",
+  padding: "12px",
+  borderRadius: "8px",
   fontWeight: "bold",
-  fontSize: "18px",
-  border: "1px solid #f87171",
-  boxShadow: "0 0 16px rgba(248,113,113,0.4)",
+  fontSize: "14px",
+  border: "1px solid #263244",
+  borderLeft: "3px solid #f97316",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.24)",
 },
  chartGrid: {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
-  gap: "15px",
-  marginBottom: "20px",
+  gap: "10px",
+  marginBottom: "16px",
 },
 
 chartBox: {
   background: "#111827",
   padding: "10px",
-  borderRadius: "10px",
-  border: "1px solid #1e293b",
-  boxShadow: "0 0 10px rgba(0,0,0,0.35)",
+  borderRadius: "8px",
+  border: "1px solid #263244",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.24)",
   color: "#f9fafb",
-  minHeight: "140px",
+  minHeight: "260px",
 },
+
+donutWrap: {
+  position: "relative",
+  height: "230px",
+},
+
+donutCenter: {
+  position: "absolute",
+  inset: 0,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  pointerEvents: "none",
+  color: "#f8fafc",
+},
+
+statusLegend: {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: "8px",
+  marginTop: "8px",
+},
+
+statusLegendItem: {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  color: "#cbd5e1",
+  fontSize: "12px",
+  minWidth: 0,
+},
+
+statusLegendDot: {
+  width: "10px",
+  height: "10px",
+  borderRadius: "50%",
+  border: "2px solid",
+  background: "transparent",
+  flexShrink: 0,
+},
+
   filters: {
     display: "flex",
     gap: "10px",
     flexWrap: "wrap",
-    marginBottom: "20px",
+    marginBottom: "16px",
   },
 
   filterBtn: {
     background: "#111827",
     color: "#f9fafb",
     border: "1px solid #374151",
-    padding: "10px 16px",
-    borderRadius: "8px",
+    padding: "8px 12px",
+    borderRadius: "6px",
     cursor: "pointer",
-    fontWeight: "bold",
+    fontWeight: "600",
+    fontSize: "12px",
     transition: "0.2s",
   },
 
@@ -514,14 +614,14 @@ chartBox: {
 card: {
   background: "#111827",
   color: "#f9fafb",
-  padding: "14px",
-  borderRadius: "10px",
-  border: "1px solid #1e293b",
-  boxShadow: "0 0 10px rgba(0,0,0,0.35)",
+  padding: "10px",
+  borderRadius: "8px",
+  border: "1px solid #263244",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.24)",
 
   display: "grid",
-  gridTemplateColumns: "2fr 3fr auto auto auto",
-  gap: "12px",
+  gridTemplateColumns: "minmax(160px, 1.4fr) minmax(220px, 2fr) auto auto minmax(120px, auto)",
+  gap: "10px",
   alignItems: "center",
 },
 
@@ -532,14 +632,24 @@ card: {
     gap: "10px",
   },
 
-  badge: {
-    padding: "6px 12px",
-    borderRadius: "999px",
-    color: "#fff",
-    fontSize: "12px",
+  severityIndicator: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    color: "#cbd5e1",
+    fontSize: "11px",
     textTransform: "capitalize",
-    fontWeight: "bold",
-    letterSpacing: "0.5px",
+    fontWeight: "700",
+    whiteSpace: "nowrap",
+  },
+
+  severityRing: {
+    width: "10px",
+    height: "10px",
+    borderRadius: "50%",
+    border: "2px solid",
+    background: "transparent",
+    flexShrink: 0,
   },
 
   desc: {
@@ -547,14 +657,14 @@ card: {
     marginBottom: "18px",
     color: "#d1d5db",
     lineHeight: "1.6",
-    fontSize: "15px",
+    fontSize: "13px",
   },
 
   infoRow: {
     display: "flex",
     justifyContent: "space-between",
     marginBottom: "10px",
-    fontSize: "14px",
+    fontSize: "12px",
     color: "#cbd5e1",
   },
 
@@ -562,22 +672,23 @@ card: {
 
 
 panelTitle: {
-  fontSize: "16px",
+  fontSize: "15px",
   fontWeight: "600",
-  marginBottom: "6px",
+  marginBottom: "8px",
 },
 
 incidentTitle: {
   fontWeight: "600",
-  fontSize: "14px",
+  fontSize: "13px",
   color: "#f8fafc",
+  overflowWrap: "anywhere",
 },
 
 incidentDesc: {
   color: "#cbd5e1",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
+  fontSize: "12px",
+  lineHeight: 1.35,
+  overflowWrap: "anywhere",
 },
 
 statusText: {
@@ -600,30 +711,35 @@ attackTypeRow: {
   color: "#f8fafc",
 },
 statLabel: {
-  fontSize: "13px",
+  fontSize: "12px",
   color: "#94a3b8",
+  fontWeight: "600",
 },
 
 statValue: {
-  marginTop: "6px",
-  fontSize: "18px",
+  marginTop: "4px",
+  fontSize: "24px",
   color: "#f8fafc",
   fontWeight: "700",
+  lineHeight: 1,
 },
 
 topSourceValue: {
-  fontSize: "18px",
+  maxWidth: "100%",
+  marginTop: "4px",
+  color: "#f8fafc",
+  fontSize: "22px",
   fontWeight: "700",
-  marginTop: "8px",
+  lineHeight: 1,
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
 },
 
 topSourceMeta: {
-  marginTop: "6px",
+  marginTop: "4px",
   color: "#94a3b8",
-  fontSize: "12px",
+  fontSize: "11px",
 },
 
 

@@ -719,18 +719,18 @@ const styles = {
     background: "#0f172a",
     color: "#f8fafc",
     minHeight: "100vh",
-    padding: "30px",
+    padding: "16px",
   },
 
   title: {
-    fontSize: "34px",
+    fontSize: "24px",
     marginBottom: "20px",
   },
 
   grid: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
-    gap: "20px",
+    gap: "14px",
     marginBottom: "20px",
   },
 
@@ -738,12 +738,12 @@ const styles = {
     background: "#111827",
     border: "1px solid #334155",
     borderRadius: "14px",
-    padding: "20px",
+    padding: "14px",
   },
 
   relatedItem: {
     marginTop: "10px",
-    padding: "12px",
+    padding: "9px",
     background: "#1e293b",
     borderRadius: "8px",
     border: "1px solid #475569",
@@ -758,7 +758,7 @@ const styles = {
   color: "#f8fafc",
   border: "1px solid #334155",
   borderRadius: "8px",
-  padding: "12px",
+  padding: "9px",
   marginBottom: "10px",
 },
 
@@ -766,7 +766,7 @@ saveBtn: {
   background: "#2563eb",
   color: "#fff",
   border: "none",
-  padding: "10px 14px",
+  padding: "8px 10px",
   borderRadius: "8px",
   cursor: "pointer",
   fontWeight: "bold",
@@ -776,7 +776,7 @@ deleteNoteBtn: {
   background: "#7f1d1d",
   color: "#fff",
   border: "none",
-  padding: "8px 10px",
+  padding: "6px 8px",
   borderRadius: "6px",
   cursor: "pointer",
   fontWeight: "bold",
@@ -789,7 +789,7 @@ select: {
   color: "#f8fafc",
   border: "1px solid #334155",
   borderRadius: "8px",
-  padding: "10px",
+  padding: "8px",
   marginTop: "10px",
   marginBottom: "10px",
 },

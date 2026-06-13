@@ -695,12 +695,12 @@ const styles = {
     background: "#0f172a",
     color: "#f8fafc",
     minHeight: "100vh",
-    padding: "25px",
+    padding: "16px",
   },
 
   title: {
     margin: 0,
-    fontSize: "34px",
+    fontSize: "24px",
   },
 
   subtitle: {
@@ -720,7 +720,7 @@ const styles = {
     background: "#111827",
     border: "1px solid #1e293b",
     borderRadius: "14px",
-    padding: "18px",
+    padding: "12px",
     display: "flex",
     flexDirection: "column",
     gap: "10px",
@@ -761,7 +761,7 @@ const styles = {
     background: "#111827",
     border: "1px solid #1e293b",
     borderRadius: "14px",
-    padding: "18px",
+    padding: "12px",
     overflowX: "auto",
   },
 
@@ -769,7 +769,7 @@ const styles = {
     background: "#111827",
     border: "1px solid #1e293b",
     borderRadius: "14px",
-    padding: "18px",
+    padding: "12px",
   },
 
   panelTitle: {
@@ -784,12 +784,12 @@ const styles = {
 
   th: {
     textAlign: "left",
-    padding: "10px",
+    padding: "8px",
     borderBottom: "1px solid #334155",
   },
 
   td: {
-    padding: "10px",
+    padding: "8px",
     borderBottom: "1px solid #1e293b",
   },
 
@@ -799,7 +799,7 @@ const styles = {
 
   detailRow: {
     borderBottom: "1px solid #334155",
-    padding: "12px 0",
+    padding: "8px 0",
     display: "flex",
     flexDirection: "column",
     gap: "5px",
@@ -810,7 +810,7 @@ const styles = {
     background: "#7f1d1d",
     border: "1px solid #ef4444",
     borderRadius: "10px",
-    padding: "14px",
+    padding: "10px",
   },
 
   emptyText: {
@@ -825,7 +825,7 @@ const styles = {
   background: "#020617",
   border: "1px solid #334155",
   borderRadius: "10px",
-  padding: "14px",
+  padding: "10px",
 },
 
 relatedItem: {

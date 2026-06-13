@@ -382,11 +382,11 @@ const styles = {
     background: "#0f172a",
     color: "#f8fafc",
     minHeight: "100vh",
-    padding: "30px",
+    padding: "16px",
   },
 
   title: {
-    fontSize: "34px",
+    fontSize: "24px",
     marginBottom: "8px",
   },
 
@@ -399,7 +399,7 @@ const styles = {
     background: "#111827",
     border: "1px solid #334155",
     borderRadius: "14px",
-    padding: "22px",
+    padding: "14px",
     maxWidth: "700px",
   },
 
@@ -407,7 +407,7 @@ const styles = {
     background: "#16a34a",
     color: "#fff",
     border: "none",
-    padding: "12px 18px",
+    padding: "9px 14px",
     borderRadius: "8px",
     cursor: "pointer",
     fontWeight: "bold",

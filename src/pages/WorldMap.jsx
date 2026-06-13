@@ -643,12 +643,12 @@ const styles = {
     background: "#0f172a",
     color: "#f8fafc",
     minHeight: "100vh",
-    padding: "25px",
+    padding: "16px",
   },
 
   title: {
    
-  fontSize: "26px",
+  fontSize: "22px",
   fontWeight: "700",
 
   },
@@ -661,15 +661,15 @@ const styles = {
   summaryGrid: {
   display: "grid",
   gridTemplateColumns: "repeat(4, 1fr)",
-  gap: "16px",
-  marginBottom: "20px",
+  gap: "12px",
+  marginBottom: "14px",
 },
 
  summaryCard: {
   background: "#111827",
   border: "1px solid #334155",
   borderRadius: "12px",
-  padding: "12px",
+  padding: "10px",
   textAlign: "center",
   boxShadow: "0 0 12px rgba(59,130,246,0.12)",
 
@@ -677,7 +677,7 @@ const styles = {
   flexDirection: "column",
   justifyContent: "center",
 
-  minHeight: "90px",
+  minHeight: "72px",
 },
   mapBox: {
     background: "#020617",
@@ -685,17 +685,17 @@ const styles = {
     borderRadius: "16px",
     height: "650px",
     overflow: "hidden",
-    marginBottom: "20px",
+    marginBottom: "14px",
   },
   summaryLabel: {
   margin: 0,
   color: "#cbd5e1",
-  fontSize: "15px",
+  fontSize: "13px",
   fontWeight: "500",
 },
 
 summaryValue: {
-  fontSize: "30px",
+  fontSize: "24px",
   margin: "10px 0 0",
   fontWeight: "700",
   color: "#f8fafc",
@@ -704,21 +704,21 @@ summaryValue: {
   twoColumnGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-    gap: "20px",
-    marginBottom: "20px",
+    gap: "14px",
+    marginBottom: "14px",
   },
 
   panel: {
     background: "#111827",
     border: "1px solid #1e293b",
     borderRadius: "14px",
-    padding: "18px",
-    marginBottom: "20px",
+    padding: "14px",
+    marginBottom: "14px",
   },
 
   panelTitle: {
     margin: 0,
-    fontSize: "18px",
+    fontSize: "16px",
     fontWeight: "700",
   },
 
@@ -742,7 +742,7 @@ summaryValue: {
     background: "rgba(14, 165, 233, 0.12)",
     border: "1px solid rgba(56, 189, 248, 0.35)",
     borderRadius: "999px",
-    padding: "6px 10px",
+    padding: "5px 8px",
     fontSize: "12px",
     fontWeight: "700",
   },
@@ -756,7 +756,7 @@ summaryValue: {
     display: "flex",
     alignItems: "center",
     gap: "12px",
-    padding: "11px",
+    padding: "9px",
     background: "#1e293b",
     border: "1px solid #334155",
     borderRadius: "8px",
@@ -772,7 +772,7 @@ summaryValue: {
     color: "#0f172a",
     background: "#38bdf8",
     borderRadius: "50%",
-    fontSize: "14px",
+    fontSize: "12px",
     fontWeight: "800",
   },
 
@@ -826,7 +826,7 @@ summaryValue: {
     justifyContent: "space-between",
     alignItems: "center",
     gap: "12px",
-    padding: "10px",
+    padding: "8px",
     background: "#1e293b",
     borderRadius: "10px",
     border: "1px solid #334155",
@@ -835,16 +835,16 @@ summaryValue: {
 
   badge: {
     color: "#fff",
-    padding: "6px 10px",
+    padding: "5px 8px",
     borderRadius: "999px",
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: "bold",
     textTransform: "uppercase",
   },
 
   ipItem: {
     marginTop: "10px",
-    padding: "10px",
+    padding: "8px",
     background: "#1e293b",
     borderRadius: "8px",
     border: "1px solid #475569",

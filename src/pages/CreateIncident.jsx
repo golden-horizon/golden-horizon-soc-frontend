@@ -142,21 +142,21 @@ const styles = {
     justifyContent: "center",
     alignItems: "center",
     background: "#f4f6f8",
-    padding: "20px",
+    padding: "16px",
   },
 
   card: {
     width: "100%",
     maxWidth: "450px",
     background: "#fff",
-    padding: "25px",
+    padding: "16px",
     borderRadius: "14px",
     boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
   },
 
   input: {
     width: "100%",
-    padding: "12px",
+    padding: "9px",
     marginTop: "10px",
     marginBottom: "15px",
     border: "1px solid #d1d5db",
@@ -167,7 +167,7 @@ const styles = {
 
   button: {
     width: "100%",
-    padding: "12px",
+    padding: "9px",
     background: "#4f46e5",
     color: "#fff",
     border: "none",
@@ -179,7 +179,7 @@ const styles = {
 
   cancel: {
     width: "100%",
-    padding: "12px",
+    padding: "9px",
     background: "#e5e7eb",
     color: "#111827",
     border: "none",

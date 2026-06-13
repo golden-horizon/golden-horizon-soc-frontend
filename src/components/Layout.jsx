@@ -13,6 +13,8 @@ export default function Layout() {
     incidents: 0,
     critical: 0,
   });
+  const [latestCve, setLatestCve] = useState(null);
+  const [latestCveStatus, setLatestCveStatus] = useState("Loading latest CVE...");
 
   const loadSidebarStats = useCallback(async () => {
     try {
@@ -53,6 +55,55 @@ export default function Layout() {
     };
   }, [loadSidebarStats]);
 
+  useEffect(() => {
+    const loadLatestCriticalCve = async () => {
+      try {
+        const now = new Date();
+        const start = new Date(now);
+        start.setDate(now.getDate() - 7);
+
+        const params = new URLSearchParams({
+          cvssV3Severity: "CRITICAL",
+          pubStartDate: start.toISOString(),
+          pubEndDate: now.toISOString(),
+          resultsPerPage: "20",
+        });
+
+        const res = await axios.get(
+          `https://services.nvd.nist.gov/rest/json/cves/2.0?${params.toString()}`
+        );
+
+        const vulnerabilities = Array.isArray(res.data?.vulnerabilities)
+          ? res.data.vulnerabilities
+          : [];
+
+        if (vulnerabilities.length === 0) {
+          setLatestCveStatus("No recent Critical CVEs");
+          return;
+        }
+
+        const latest = [...vulnerabilities].sort(
+          (a, b) => new Date(b.cve.published) - new Date(a.cve.published)
+        )[0].cve;
+
+        const cvssMetric =
+          latest.metrics?.cvssMetricV31?.[0] || latest.metrics?.cvssMetricV30?.[0];
+
+        setLatestCve({
+          id: latest.id,
+          score: cvssMetric?.cvssData?.baseScore || "N/A",
+          published: latest.published,
+        });
+        setLatestCveStatus("Live from NVD");
+      } catch (err) {
+        console.error("Failed to load latest NVD CVE:", err);
+        setLatestCveStatus("NVD unavailable");
+      }
+    };
+
+    loadLatestCriticalCve();
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     socket.disconnect();
@@ -75,6 +126,23 @@ export default function Layout() {
   return "SOC Platform";
 };
 
+  const formatCvePublished = (published) => {
+    if (!published) return "Published date unavailable";
+
+    const date = new Date(published);
+    const today = new Date();
+
+    if (date.toDateString() === today.toDateString()) {
+      return "Published Today";
+    }
+
+    return `Published ${date.toLocaleDateString("en-AU", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })}`;
+  };
+
   return (
     <div style={styles.shell}>
       <div style={styles.sidebar}>
@@ -96,6 +164,7 @@ export default function Layout() {
 </div>
 
       <button
+  className="soc-nav-link"
   onClick={() => navigate("/dashboard")}
   style={navStyle(isActive("/dashboard"))}
 >
@@ -103,6 +172,7 @@ export default function Layout() {
 </button>
 
 <button
+  className="soc-nav-link"
   onClick={() => navigate("/create-incident")}
   style={navStyle(isActive("/create-incident"))}
 >
@@ -110,6 +180,7 @@ export default function Layout() {
 </button>
 
 <button
+  className="soc-nav-link"
   onClick={() => navigate("/investigation")}
   style={navStyle(isActive("/investigation"))}
 >
@@ -117,6 +188,7 @@ export default function Layout() {
 </button>
 
 <button
+  className="soc-nav-link"
   onClick={() => navigate("/security-events")}
   style={navStyle(isActive("/security-events"))}
 >
@@ -124,6 +196,7 @@ export default function Layout() {
 </button>
 
 <button
+  className="soc-nav-link"
   onClick={() => navigate("/world-map")}
   style={navStyle(isActive("/world-map"))}
 >
@@ -131,6 +204,7 @@ export default function Layout() {
 </button>
 
 <button
+  className="soc-nav-link"
   onClick={() => navigate("/threat-hunting")}
   style={navStyle(isActive("/threat-hunting"))}
 >
@@ -138,6 +212,7 @@ export default function Layout() {
 </button>
 
 <button
+  className="soc-nav-link"
   onClick={() => navigate("/threat-intelligence")}
   style={navStyle(isActive("/threat-intelligence"))}
 >
@@ -145,6 +220,7 @@ export default function Layout() {
 </button>
 
 <button
+  className="soc-nav-link"
   onClick={() => navigate("/executive-dashboard")}
   style={navStyle(isActive("/executive-dashboard"))}
 >
@@ -152,6 +228,7 @@ export default function Layout() {
 </button>
 
 <button
+  className="soc-nav-link"
   onClick={() => navigate("/reports")}
   style={navStyle(isActive("/reports"))}
 >
@@ -168,6 +245,7 @@ export default function Layout() {
 </div>
 
 <a
+  className="soc-resource-link"
   href="https://www.cve.org"
   target="_blank"
   rel="noreferrer"
@@ -178,6 +256,7 @@ export default function Layout() {
   </a>
 
   <a
+    className="soc-resource-link"
     href="https://attack.mitre.org"
     target="_blank"
     rel="noreferrer"
@@ -188,6 +267,7 @@ export default function Layout() {
   </a>
 
   <a
+    className="soc-resource-link"
     href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
     target="_blank"
     rel="noreferrer"
@@ -196,6 +276,68 @@ export default function Layout() {
   >
     <img src={cisaLogo} alt="CISA" style={styles.resourceLogo} />
   </a>
+
+  <div style={styles.latestIntelPanel}>
+    <div style={styles.latestIntelHeader}>Latest Threat Intel</div>
+    <div style={styles.latestIntelSync}>{latestCveStatus}</div>
+
+    <a
+      href={
+        latestCve
+          ? `https://nvd.nist.gov/vuln/detail/${latestCve.id}`
+          : "https://nvd.nist.gov/vuln/search"
+      }
+      target="_blank"
+      rel="noreferrer"
+      style={styles.latestIntelItem}
+    >
+      <span style={styles.intelType}>CVE</span>
+      <div style={styles.intelContent}>
+        <strong style={styles.intelValue}>
+          {latestCve ? `${latestCve.id} (open)` : "Latest Critical CVE"}
+        </strong>
+        {latestCve ? (
+          <>
+            <span style={styles.intelMetaCritical}>
+              <span style={styles.criticalDot} />
+              CVSS {latestCve.score}
+            </span>
+            <span style={styles.intelMeta}>
+              {formatCvePublished(latestCve.published)}
+            </span>
+          </>
+        ) : (
+          <span style={styles.intelMeta}>Waiting for NVD response</span>
+        )}
+      </div>
+    </a>
+
+    <a
+      href="https://attack.mitre.org/techniques/T1190/"
+      target="_blank"
+      rel="noreferrer"
+      style={styles.latestIntelItem}
+    >
+      <span style={styles.intelType}>MITRE</span>
+      <div style={styles.intelContent}>
+        <strong style={styles.intelValue}>T1190 (open)</strong>
+        <span style={styles.intelMeta}>Exploit Public-Facing Application</span>
+      </div>
+    </a>
+
+    <a
+      href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      target="_blank"
+      rel="noreferrer"
+      style={styles.latestIntelItem}
+    >
+      <span style={styles.intelType}>CISA</span>
+      <div style={styles.intelContent}>
+        <strong style={styles.intelValue}>KEV Added (open)</strong>
+        <span style={styles.intelMeta}>Fortinet SSL-VPN</span>
+      </div>
+    </a>
+  </div>
 </div>
 
 <button onClick={handleLogout} style={styles.logout}>
@@ -249,6 +391,7 @@ const styles = {
   flexDirection: "column",
   gap: "6px",
   borderRight: "1px solid #1e293b",
+  overflowY: "auto",
 },
 
   logo: {
@@ -340,6 +483,78 @@ resourceSubtitle: {
   fontSize: "12px",
   textAlign: "center",
   marginBottom: "10px",
+},
+latestIntelPanel: {
+  width: "100%",
+  marginTop: "4px",
+  padding: "10px",
+  boxSizing: "border-box",
+  background: "#0f172a",
+  border: "1px solid #263244",
+  borderRadius: "8px",
+},
+latestIntelHeader: {
+  color: "#94a3b8",
+  fontSize: "10px",
+  fontWeight: "700",
+  letterSpacing: "1.4px",
+  textTransform: "uppercase",
+  marginBottom: "4px",
+},
+latestIntelSync: {
+  color: "#64748b",
+  fontSize: "10px",
+  marginBottom: "6px",
+},
+latestIntelItem: {
+  display: "grid",
+  gridTemplateColumns: "42px 1fr",
+  gap: "8px",
+  padding: "8px 0",
+  borderTop: "1px solid #1e293b",
+  color: "inherit",
+  textDecoration: "none",
+},
+intelType: {
+  alignSelf: "start",
+  color: "#38bdf8",
+  fontSize: "10px",
+  fontWeight: "700",
+  letterSpacing: "0.6px",
+},
+intelContent: {
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: "2px",
+},
+intelValue: {
+  color: "#f8fafc",
+  fontSize: "12px",
+  lineHeight: 1.2,
+  overflowWrap: "anywhere",
+},
+intelMeta: {
+  color: "#94a3b8",
+  fontSize: "11px",
+  lineHeight: 1.25,
+  overflowWrap: "anywhere",
+},
+intelMetaCritical: {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "5px",
+  color: "#fecaca",
+  fontSize: "11px",
+  fontWeight: "700",
+  lineHeight: 1.25,
+},
+criticalDot: {
+  width: "7px",
+  height: "7px",
+  borderRadius: "50%",
+  background: "#ef4444",
+  flexShrink: 0,
 },
 userPanel: {
   background: "#111827",

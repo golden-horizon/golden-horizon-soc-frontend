@@ -211,7 +211,7 @@ const styles = {
   minHeight: "100vh",
   background: "#030712",
   color: "#f9fafb",
-  padding: "25px",
+  padding: "16px",
 },
   title: {
     marginBottom: "20px",
@@ -229,26 +229,26 @@ const styles = {
    gridTemplateColumns: "1.6fr 1.8fr 0.8fr 0.9fr 1.4fr 1.8fr",
     background: "#020617",
     color: "#94a3b8",
-    padding: "12px",
+    padding: "9px",
     fontWeight: "bold",
-    fontSize: "13px",
+    fontSize: "12px",
     textTransform: "uppercase",
   },
 
   row: {
   display: "grid",
   gridTemplateColumns: "1.6fr 1.8fr 0.8fr 0.9fr 1.4fr 1.8fr",
-  padding: "12px",
+  padding: "9px",
   borderTop: "1px solid #1e293b",
   background: "#111827",
-  fontSize: "14px",
+  fontSize: "12px",
   cursor: "pointer",
   transition: "0.2s",
 },
   layout: {
   display: "grid",
   gridTemplateColumns: "3fr 1fr",
-  gap: "20px",
+  gap: "14px",
   alignItems: "start",
 },
 
@@ -256,7 +256,7 @@ detailsPanel: {
   background: "#0b1120",
   border: "1px solid #1e293b",
   borderRadius: "10px",
-  padding: "14px",
+  padding: "10px",
   color: "#fff",
   position: "sticky",
   top: "20px",
@@ -278,18 +278,18 @@ emptyDetails: {
 detailItem: {
   display: "flex",
   justifyContent: "space-between",
-  padding: "10px 0",
+  padding: "8px 0",
   borderBottom: "1px solid #1e293b",
 },
 
 detailBlock: {
-  padding: "10px 0",
+  padding: "8px 0",
   borderBottom: "1px solid #1e293b",
 },
 summaryGrid: {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "12px",
+  gap: "10px",
   marginBottom: "18px",
 },
 
@@ -297,10 +297,10 @@ summaryCard: {
   background: "#0b1120",
   border: "1px solid #1e293b",
   borderRadius: "10px",
-  padding: "14px",
+  padding: "10px",
   color: "#f9fafb",
   fontWeight: "bold",
-  fontSize: "14px",
+  fontSize: "12px",
 },
 filters: {
   display: "flex",
@@ -314,7 +314,7 @@ searchInput: {
   color: "#f9fafb",
   border: "1px solid #1e293b",
   borderRadius: "8px",
-  padding: "10px",
+  padding: "8px",
 },
 
 select: {
@@ -322,6 +322,6 @@ select: {
   color: "#f9fafb",
   border: "1px solid #1e293b",
   borderRadius: "8px",
-  padding: "10px",
+  padding: "8px",
 },
 };
