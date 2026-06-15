@@ -117,10 +117,10 @@ export default function Reports() {
   const loadReportData = useCallback(async () => {
     try {
       const [incidentRes, eventRes] = await Promise.allSettled([
-        axios.get("http://localhost:5000/incidents", {
+        axios.get("https://golden-horizon-soc-backend.onrender.com/incidents", {
           headers: getAuthHeaders(),
         }),
-        axios.get("http://localhost:5000/security-events", {
+        axios.get("https://golden-horizon-soc-backend.onrender.com/security-events", {
           headers: getAuthHeaders(),
         }),
       ]);
@@ -706,7 +706,7 @@ export default function Reports() {
       setExportStatus("Preparing Word report...");
 
       const response = await axios.get(
-        "http://localhost:5000/reports/executive.docx",
+        "https://golden-horizon-soc-backend.onrender.com/reports/executive.docx",
         {
           headers: getAuthHeaders(),
           responseType: "blob",
@@ -828,3 +828,4 @@ const styles = {
     fontSize: "13px",
   },
 };
+

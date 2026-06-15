@@ -104,7 +104,7 @@ export default function WorldMap() {
 
       try {
         const response = await axios.get(
-          `http://localhost:5000/geoip/${lookupIP}`,
+          `https://golden-horizon-soc-backend.onrender.com/geoip/${lookupIP}`,
           {
             headers: getAuthHeaders(),
           }
@@ -132,7 +132,7 @@ export default function WorldMap() {
 
   const loadIncidents = useCallback(async () => {
     try {
-      const res = await axios.get("http://localhost:5000/incidents", {
+      const res = await axios.get("https://golden-horizon-soc-backend.onrender.com/incidents", {
         headers: getAuthHeaders(),
       });
 
@@ -984,3 +984,4 @@ const styles = {
     fontSize: "12px",
   },
 };
+

@@ -300,7 +300,7 @@ export default function SecurityEvents() {
 
     const loadEvents = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/security-events");
+        const res = await axios.get("https://golden-horizon-soc-backend.onrender.com/security-events");
 
         if (isMounted) {
           setEvents(res.data || []);
@@ -830,3 +830,4 @@ const styles = {
     fontSize: "12px",
   },
 };
+

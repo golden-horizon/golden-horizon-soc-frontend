@@ -6,7 +6,7 @@ import {
   getPresentationIP,
 } from "../utils/geoPresentation";
 
-const API = "http://localhost:5000";
+const API = "https://golden-horizon-soc-backend.onrender.com";
 
 const normalise = (value) => (value || "").toString().toLowerCase();
 
@@ -1497,4 +1497,5 @@ const styles = {
     margin: 0,
   },
 };
+
 

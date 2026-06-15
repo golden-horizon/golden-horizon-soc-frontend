@@ -57,13 +57,13 @@ export default function ExecutiveDashboard() {
   const loadIncidents = useCallback(async () => {
     try {
       const [incidentRes, eventRes, loginRes] = await Promise.allSettled([
-        axios.get("http://localhost:5000/incidents", {
+        axios.get("https://golden-horizon-soc-backend.onrender.com/incidents", {
           headers: getAuthHeaders(),
         }),
-        axios.get("http://localhost:5000/security-events", {
+        axios.get("https://golden-horizon-soc-backend.onrender.com/security-events", {
           headers: getAuthHeaders(),
         }),
-        axios.get("http://localhost:5000/login-activity", {
+        axios.get("https://golden-horizon-soc-backend.onrender.com/login-activity", {
           headers: getAuthHeaders(),
         }),
       ]);
@@ -287,7 +287,7 @@ export default function ExecutiveDashboard() {
       try {
         const geoResults = await Promise.all(
           sourceIPs.map(async (ip) => {
-            const res = await axios.get(`http://localhost:5000/geoip/${ip}`, {
+            const res = await axios.get(`https://golden-horizon-soc-backend.onrender.com/geoip/${ip}`, {
               headers: getAuthHeaders(),
             });
 
@@ -744,3 +744,4 @@ const styles = {
     margin: 0,
   },
 };
+

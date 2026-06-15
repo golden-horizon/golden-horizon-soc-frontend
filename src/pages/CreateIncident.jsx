@@ -38,7 +38,7 @@ export default function CreateIncident() {
 
     try {
       await axios.post(
-        "http://localhost:5000/incidents",
+        "https://golden-horizon-soc-backend.onrender.com/incidents",
         {
           title: title.trim(),
           description: description.trim(),
@@ -201,3 +201,4 @@ const styles = {
     textAlign: "center",
   },
 };
+

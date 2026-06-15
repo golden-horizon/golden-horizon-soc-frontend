@@ -29,7 +29,7 @@ const [, setClosureSummary] = useState(null);
     try {
       const token = localStorage.getItem("token");
 
-      const res = await axios.get("http://localhost:5000/incidents", {
+      const res = await axios.get("https://golden-horizon-soc-backend.onrender.com/incidents", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -231,7 +231,7 @@ const updateIncidentStatus = async () => {
     const token = localStorage.getItem("token");
 
     const res = await axios.put(
-      `http://localhost:5000/incidents/${incident.id}`,
+      `https://golden-horizon-soc-backend.onrender.com/incidents/${incident.id}`,
       {
         status: newStatus,
       },
@@ -787,3 +787,4 @@ actionBtn: {
 },
 
 };
+

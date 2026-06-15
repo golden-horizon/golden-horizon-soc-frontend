@@ -23,7 +23,7 @@ export default function Layout() {
 
       if (!token) return;
 
-      const res = await axios.get("http://localhost:5000/incidents", {
+      const res = await axios.get("https://golden-horizon-soc-backend.onrender.com/incidents", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -637,3 +637,4 @@ userStats: {
   fontSize: "11px",
 },
 };
+

@@ -50,7 +50,7 @@ export default function Login() {
 
     try {
       if (step === "credentials") {
-        const res = await axios.post("http://localhost:5000/login", {
+        const res = await axios.post("https://golden-horizon-soc-backend.onrender.com/login", {
           email,
           password,
         });
@@ -70,7 +70,7 @@ export default function Login() {
         return;
       }
 
-      const res = await axios.post("http://localhost:5000/login/mfa", {
+      const res = await axios.post("https://golden-horizon-soc-backend.onrender.com/login/mfa", {
         email,
         password,
         code: mfaCode,
@@ -394,3 +394,4 @@ const styles = {
     letterSpacing: "0.02em",
   },
 };
+

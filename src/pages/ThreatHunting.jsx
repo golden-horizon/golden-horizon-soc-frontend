@@ -34,7 +34,7 @@ export default function ThreatHunting() {
 
   const loadIncidents = useCallback(async () => {
     try {
-      const res = await axios.get("http://localhost:5000/incidents", {
+      const res = await axios.get("https://golden-horizon-soc-backend.onrender.com/incidents", {
         headers: getAuthHeaders(),
       });
 
@@ -111,7 +111,7 @@ export default function ThreatHunting() {
       try {
         const geoResults = await Promise.all(
           sourceIPs.map(async (ip) => {
-            const res = await axios.get(`http://localhost:5000/geoip/${ip}`, {
+            const res = await axios.get(`https://golden-horizon-soc-backend.onrender.com/geoip/${ip}`, {
               headers: getAuthHeaders(),
             });
 
@@ -463,3 +463,4 @@ investigateBtn: {
   marginTop: "10px",
 },
 };
+
