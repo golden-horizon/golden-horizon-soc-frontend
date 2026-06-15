@@ -108,3 +108,35 @@ Navid Ghobadpour
 
 Sydney, Australia
 
+## Screenshots
+
+### Login & MFA
+![Login](public/screenshots/login.png)
+
+### Dashboard
+![Dashboard](public/screenshots/dashboard.png)
+
+### Investigation Center
+![Investigation](public/screenshots/investigation.png)
+
+### Security Events
+![Security Events](public/screenshots/security-events.png)
+
+### Threat Hunting
+![Threat Hunting](public/screenshots/threat-hunting.png)
+
+### Threat Intelligence
+![Threat Intelligence](public/screenshots/threat%20intellegence.png)
+
+### World Map
+![World Map](public/screenshots/world-map.png)
+
+### Executive Dashboard
+![Executive Dashboard](public/screenshots/executive-dashboard.png)
+
+### Reports - Executive Summary
+![Executive Report](public/screenshots/report1.png)
+
+### Reports - Detailed Analysis
+![Detailed Report](public/screenshots/report2.png)
+
