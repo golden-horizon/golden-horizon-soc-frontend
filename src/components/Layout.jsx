@@ -5,6 +5,7 @@ import socket from "../pages/socket";
 import cveLogo from "../assets/cve.png";
 import mitreLogo from "../assets/mitre.png";
 import cisaLogo from "../assets/cisa.png";
+import goldenHorizonIcon from "../assets/golden-horizon-icon.png";
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -119,6 +120,7 @@ export default function Layout() {
   if (location.pathname.includes("world-map")) return "World Map";
   if (location.pathname.includes("executive-dashboard")) return "Executive Dashboard";
   if (location.pathname.includes("dashboard")) return "Dashboard";
+  if (location.pathname.includes("incidents/")) return "Incident Response";
   if (location.pathname.includes("threat-hunting")) return "Threat Hunting";
   if (location.pathname.includes("threat-intelligence")) return "Threat Intelligence";
   if (location.pathname.includes("reports")) return "Reports";
@@ -146,7 +148,17 @@ export default function Layout() {
   return (
     <div style={styles.shell}>
       <div style={styles.sidebar}>
-        <h2 style={styles.logo}>SOC Platform</h2>
+        <div style={styles.brand}>
+          <img
+            src={goldenHorizonIcon}
+            alt="Golden Horizon"
+            style={styles.brandIcon}
+          />
+          <div style={styles.brandCopy}>
+            <span style={styles.brandProduct}>SOC Platform</span>
+            <span style={styles.brandCompany}>by Golden Horizon</span>
+          </div>
+        </div>
        <div style={styles.userPanel}>
   <div style={styles.userRole}>SOC Analyst</div>
 
@@ -394,11 +406,44 @@ const styles = {
   overflowY: "auto",
 },
 
-  logo: {
-    marginBottom: "14px",
-    fontSize: "16px",
-    fontWeight: "bold",
-    textAlign: "center",
+  brand: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "10px",
+    marginBottom: "16px",
+    padding: "2px 0 4px",
+  },
+
+  brandIcon: {
+    width: "58px",
+    height: "38px",
+    objectFit: "contain",
+    borderRadius: "6px",
+    flexShrink: 0,
+  },
+
+  brandCopy: {
+    display: "flex",
+    flexDirection: "column",
+    lineHeight: 1.05,
+    minWidth: 0,
+  },
+
+  brandCompany: {
+    color: "#d9b85f",
+    fontSize: "12px",
+    fontWeight: "700",
+    letterSpacing: "0.3px",
+    whiteSpace: "nowrap",
+  },
+
+  brandProduct: {
+    color: "#f8fafc",
+    fontSize: "18px",
+    fontWeight: "800",
+    letterSpacing: "0",
+    whiteSpace: "nowrap",
   },
 
  link: {

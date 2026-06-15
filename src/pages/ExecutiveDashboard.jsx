@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import {
+  getGeoIPLookupIP,
+  getPresentationIP,
+  isExternalCountry,
+  isGeoIPVisualizationIP,
+} from "../utils/geoPresentation";
 
 const MITRE_TECHNIQUES = [
   {
@@ -24,22 +30,6 @@ const MITRE_TECHNIQUES = [
   },
 ];
 
-const isExternalIP = (ip) => {
-  if (!ip) return false;
-
-  return !(
-    ip === "::1" ||
-    ip === "127.0.0.1" ||
-    ip === "::ffff:127.0.0.1" ||
-    ip.startsWith("10.") ||
-    ip.startsWith("192.168.") ||
-    /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)
-  );
-};
-
-const isExternalCountry = (country) =>
-  country && country !== "Localhost" && country !== "Unknown";
-
 const getSeverityColor = (severity) => {
   const value = String(severity || "").toLowerCase();
 
@@ -51,6 +41,8 @@ const getSeverityColor = (severity) => {
 
 export default function ExecutiveDashboard() {
   const [incidents, setIncidents] = useState([]);
+  const [securityEvents, setSecurityEvents] = useState([]);
+  const [loginActivity, setLoginActivity] = useState([]);
   const [countryStats, setCountryStats] = useState({});
   const [lastUpdated, setLastUpdated] = useState(null);
 
@@ -64,11 +56,33 @@ export default function ExecutiveDashboard() {
 
   const loadIncidents = useCallback(async () => {
     try {
-      const res = await axios.get("http://localhost:5000/incidents", {
-        headers: getAuthHeaders(),
-      });
+      const [incidentRes, eventRes, loginRes] = await Promise.allSettled([
+        axios.get("http://localhost:5000/incidents", {
+          headers: getAuthHeaders(),
+        }),
+        axios.get("http://localhost:5000/security-events", {
+          headers: getAuthHeaders(),
+        }),
+        axios.get("http://localhost:5000/login-activity", {
+          headers: getAuthHeaders(),
+        }),
+      ]);
 
-      setIncidents(Array.isArray(res.data) ? res.data : []);
+      setIncidents(
+        incidentRes.status === "fulfilled" && Array.isArray(incidentRes.value.data)
+          ? incidentRes.value.data
+          : []
+      );
+      setSecurityEvents(
+        eventRes.status === "fulfilled" && Array.isArray(eventRes.value.data)
+          ? eventRes.value.data
+          : []
+      );
+      setLoginActivity(
+        loginRes.status === "fulfilled" && Array.isArray(loginRes.value.data)
+          ? loginRes.value.data
+          : []
+      );
       setLastUpdated(new Date());
     } catch (err) {
       console.error("Failed to load executive dashboard:", err);
@@ -86,32 +100,57 @@ export default function ExecutiveDashboard() {
   const closed = incidents.filter((i) => i.status === "closed").length;
   const critical = incidents.filter((i) => i.severity === "critical").length;
   const high = incidents.filter((i) => i.severity === "high").length;
+  const medium = incidents.filter((i) => i.severity === "medium").length;
   const uniqueIPs = new Set(
-    incidents.map((i) => i.source_ip).filter(Boolean)
+    incidents
+      .map((i) => i.source_ip)
+      .filter(isGeoIPVisualizationIP)
+      .map(getPresentationIP)
   ).size;
 
   const externalSources = new Set(
-    incidents.map((i) => i.source_ip).filter(isExternalIP)
+    incidents
+      .map((i) => i.source_ip)
+      .filter(isGeoIPVisualizationIP)
+      .map(getPresentationIP)
   ).size;
 
   const affectedUsers =
-    new Set(incidents.map((i) => i.user_id).filter(Boolean)).size ||
-    (total > 0 ? 1 : 0);
+    new Set(
+      [
+        ...incidents.map((i) => i.user_id),
+        ...securityEvents.map((event) => event.username),
+        ...loginActivity.map((activity) => activity.username),
+      ].filter(Boolean)
+    ).size || (total > 0 ? 1 : 0);
 
   const criticalOpenCases = incidents.filter(
     (i) => i.severity === "critical" && i.status !== "closed"
   ).length;
 
   const attackSources = uniqueIPs;
-  const securityScore = Math.round(
+  // Weighted health score: compare current risk load against expected maximum
+  // portfolio risk, so busy demo data stays dynamic without collapsing to 0.
+  const totalRiskWeight =
+    critical * 4 + high * 2 + medium * 1 + open * 0.5 + attackSources * 2;
+  const maxExpectedRisk = Math.max(total * 4, 100);
+  const rawScore = Math.round(
     Math.max(
       0,
-      100 - critical * 4 - high * 2 - open * 0.5 - attackSources * 2
+      100 - (totalRiskWeight / maxExpectedRisk) * 100
     )
   );
+  const isCriticalRiskEnvironment =
+    criticalOpenCases >= 10 ||
+    (critical >= Math.max(total * 0.5, 1) && open > closed);
+  const securityScore = isCriticalRiskEnvironment
+    ? Math.max(rawScore, 10)
+    : Math.max(rawScore, 15);
 
   const posture =
-    securityScore >= 75
+    isCriticalRiskEnvironment
+      ? "Critical Risk"
+      : securityScore >= 75
       ? "Low Risk"
       : securityScore >= 50
       ? "Medium Risk"
@@ -124,11 +163,34 @@ export default function ExecutiveDashboard() {
       ? "#f97316"
       : "#dc2626";
 
-  const topRisks = incidents
-    .filter((i) => i.severity === "critical" || i.severity === "high")
+  const topRisks = Object.values(
+    incidents
+      .filter((i) => i.severity === "critical" || i.severity === "high")
+      .reduce((acc, incident) => {
+        const key = incident.title || "Untitled Risk";
+        const order = { critical: 0, high: 1 };
+
+        if (!acc[key]) {
+          acc[key] = {
+            title: key,
+            count: 0,
+            severity: incident.severity,
+            status: incident.status || "open",
+          };
+        }
+
+        acc[key].count += 1;
+
+        if (order[incident.severity] < order[acc[key].severity]) {
+          acc[key].severity = incident.severity;
+        }
+
+        return acc;
+      }, {})
+  )
     .sort((a, b) => {
       const order = { critical: 0, high: 1 };
-      return order[a.severity] - order[b.severity];
+      return order[a.severity] - order[b.severity] || b.count - a.count;
     })
     .slice(0, 3);
 
@@ -149,11 +211,18 @@ export default function ExecutiveDashboard() {
     [incidents]
   );
 
+  const focusRisks = topRisks
+    .slice(0, 2)
+    .map((risk) => risk.title)
+    .join(" and ");
+
   const recommendation =
     critical > 5
       ? {
-          title: "Immediate priority",
-          action: "Investigate critical incidents and review external attack sources.",
+          title: "Immediate Priority",
+          action: `Critical threat activity detected. Focus on ${
+            focusRisks || "critical incident clusters"
+          }. Review exposed internet-facing assets and implement containment actions.`,
         }
       : critical === 0 && closed > open
       ? {
@@ -175,9 +244,12 @@ export default function ExecutiveDashboard() {
           action: "Continue monitoring and maintain routine incident review.",
         };
 
-  const topAttackCountry =
-    Object.entries(countryStats).sort((a, b) => b[1] - a[1])[0]?.[0] ||
-    "No GeoIP data";
+  const topCountryEntry = Object.entries(countryStats).sort((a, b) => b[1] - a[1])[0];
+  const topThreatSourceCountry = topCountryEntry
+    ? `${topCountryEntry[0]} (${topCountryEntry[1]} ${
+        topCountryEntry[1] === 1 ? "incident" : "incidents"
+      })`
+    : "No GeoIP data";
 
   const threatTrend =
     criticalOpenCases > 0 || critical + high > closed
@@ -199,7 +271,12 @@ export default function ExecutiveDashboard() {
   useEffect(() => {
     const loadCountryStats = async () => {
       const sourceIPs = [
-        ...new Set(incidents.map((i) => i.source_ip).filter(isExternalIP)),
+        ...new Set(
+          incidents
+            .map((i) => i.source_ip)
+            .filter(isGeoIPVisualizationIP)
+            .map(getGeoIPLookupIP)
+        ),
       ];
 
       if (sourceIPs.length === 0) {
@@ -221,13 +298,13 @@ export default function ExecutiveDashboard() {
         const ipToCountry = geoResults.reduce((acc, geo) => {
           const ip = geo.ip || geo.query;
           if (ip && isExternalCountry(geo.country)) {
-            acc[ip] = geo.country;
+            acc[getPresentationIP(ip)] = geo.country;
           }
           return acc;
         }, {});
 
         const nextCountryStats = incidents.reduce((acc, incident) => {
-          const country = ipToCountry[incident.source_ip];
+          const country = ipToCountry[getPresentationIP(incident.source_ip)];
           if (!country) return acc;
 
           acc[country] = (acc[country] || 0) + 1;
@@ -317,8 +394,8 @@ export default function ExecutiveDashboard() {
         </div>
 
         <div style={styles.card}>
-          <p style={styles.cardLabel}>Top Attack Country</p>
-          <h2 style={styles.cardTextValue}>{topAttackCountry}</h2>
+          <p style={styles.cardLabel}>Top Threat Source Country</p>
+          <h2 style={styles.cardTextValue}>{topThreatSourceCountry}</h2>
         </div>
 
       </div>
@@ -330,7 +407,7 @@ export default function ExecutiveDashboard() {
           {topRisks.length > 0 ? (
             topRisks.map((risk) => (
               <div
-                key={risk.id || risk.incident_id}
+                key={risk.title}
                 style={{
                   ...styles.riskItem,
                   borderLeft: `5px solid ${getSeverityColor(risk.severity)}`,
@@ -340,7 +417,9 @@ export default function ExecutiveDashboard() {
                   <strong style={styles.riskTitle} title={risk.title}>
                     {risk.title}
                   </strong>
-                  <p>{risk.status || "open"}</p>
+                  <p>
+                    {risk.count} {risk.count === 1 ? "incident" : "incidents"}
+                  </p>
                 </div>
 
                 <span
@@ -384,7 +463,7 @@ export default function ExecutiveDashboard() {
           <h3 style={styles.panelTitle}>Business Impact Summary</h3>
 
           <div style={styles.item}>
-            <strong>Affected Users</strong>
+            <strong>Unique Affected Accounts</strong>
             <span>{affectedUsers}</span>
           </div>
 

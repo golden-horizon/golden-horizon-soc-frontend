@@ -11,6 +11,13 @@ import {
   useMap,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import {
+  getDisplayCountry,
+  getGeoIPLookupIP,
+  getPresentationIP,
+  isExternalCountry,
+  isGeoIPVisualizationIP,
+} from "../utils/geoPresentation";
 
 function MapFlyTo({ selectedMarker }) {
   const map = useMap();
@@ -53,6 +60,7 @@ const createThreatIcon = (severity) => {
     iconAnchor: [9, 9],
   });
 };
+
 export default function WorldMap() {
   const [incidents, setIncidents] = useState([]);
   const [markers, setMarkers] = useState([]);
@@ -71,11 +79,11 @@ export default function WorldMap() {
   const upsertMarker = useCallback((geoLocation) => {
     if (!geoLocation) return;
 
-    const markerIP = geoLocation.ip || geoLocation.query;
+    const markerIP = getPresentationIP(geoLocation.ip || geoLocation.query);
 
     setMarkers((prev) => {
       const existingIndex = prev.findIndex(
-        (marker) => (marker.ip || marker.query) === markerIP
+        (marker) => getPresentationIP(marker.ip || marker.query) === markerIP
       );
 
       if (existingIndex === -1) {
@@ -90,14 +98,22 @@ export default function WorldMap() {
 
   const loadMarkerForIP = useCallback(
     async (ip, { focus = false } = {}) => {
-      if (!ip) return null;
+      const lookupIP = getGeoIPLookupIP(ip);
+
+      if (!isGeoIPVisualizationIP(lookupIP)) return null;
 
       try {
-        const response = await axios.get(`http://localhost:5000/geoip/${ip}`, {
-          headers: getAuthHeaders(),
-        });
+        const response = await axios.get(
+          `http://localhost:5000/geoip/${lookupIP}`,
+          {
+            headers: getAuthHeaders(),
+          }
+        );
 
-        const geoLocation = response.data;
+        const geoLocation = {
+          ...response.data,
+          ip: getPresentationIP(response.data.ip || lookupIP),
+        };
 
         upsertMarker(geoLocation);
 
@@ -160,7 +176,7 @@ export default function WorldMap() {
         return [newIncident, ...prev];
       });
 
-      if (newIncident.source_ip) {
+      if (isGeoIPVisualizationIP(newIncident.source_ip)) {
         loadMarkerForIP(newIncident.source_ip, { focus: true });
       }
     });
@@ -176,7 +192,8 @@ export default function WorldMap() {
       ...new Set(
         incidents
           .map((incident) => incident.source_ip)
-          .filter(Boolean)
+          .filter(isGeoIPVisualizationIP)
+          .map(getGeoIPLookupIP)
       ),
     ],
     [incidents]
@@ -206,7 +223,8 @@ export default function WorldMap() {
   };
 
   const getIPIncidents = (ip) => {
-    return incidents.filter((i) => i.source_ip === ip);
+    const displayIP = getPresentationIP(ip);
+    return incidents.filter((i) => getPresentationIP(i.source_ip) === displayIP);
   };
 
   const getMarkerIncidents = (marker) => {
@@ -233,16 +251,23 @@ export default function WorldMap() {
   };
 
   const validMarkers = markers.filter((marker) => {
+    const ip = marker.ip || marker.query;
     const latitude = Number(marker.latitude);
     const longitude = Number(marker.longitude);
 
-    return Number.isFinite(latitude) && Number.isFinite(longitude);
+    return (
+      isGeoIPVisualizationIP(ip) &&
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude)
+    );
   });
   console.log("VALID MARKERS:", validMarkers);
 
-  const countryStats = markers.reduce((acc, marker) => {
-    const country = marker.country || "Unknown";
+  const countryStats = validMarkers.reduce((acc, marker) => {
+    const country = getDisplayCountry(marker.country);
     const incidentCount = getMarkerIncidents(marker).length;
+
+    if (!isExternalCountry(country)) return acc;
 
     acc[country] = (acc[country] || 0) + incidentCount;
     return acc;
@@ -275,10 +300,17 @@ export default function WorldMap() {
           .sort((a, b) => b.count - a.count)[0]
       : null;
 
-  const highestRisk = criticalCount > 0
+  const topSourceConcentration =
+    incidents.length > 0 && mostActiveSource
+      ? mostActiveSource.count / incidents.length
+      : 0;
+
+  const highestRisk = criticalCount >= 5 || topSourceConcentration >= 0.5
     ? "Critical"
-    : highCount > 0
+    : criticalCount > 0 || highCount >= 3
     ? "High"
+    : highCount > 0
+    ? "Medium"
     : "Low";
 
   const latestAttacks = [...incidents]
@@ -327,12 +359,21 @@ export default function WorldMap() {
       <h3 style={{ ...styles.summaryValue, color: "#ef4444" }}>
         {highestRisk}
       </h3>
+      <span style={styles.summaryHint}>
+        Based on critical incidents, active sources, and source concentration.
+      </span>
     </div>
   </div>
 
+      <div style={styles.mapHeader}>
+        <span style={styles.mapHint}>
+          Click attack markers to view GeoIP, source IP, risk, and related incidents.
+        </span>
+      </div>
+
       <div style={styles.mapBox}>
        <MapContainer
-  center={[20, 0]}
+  center={[20, 20]}
   zoom={2}
   style={{
     height: "100%",
@@ -407,10 +448,10 @@ export default function WorldMap() {
         }}
       >
         <Popup>
-          <strong>{marker.ip || marker.query}</strong>
+          <strong>{getPresentationIP(marker.ip || marker.query)}</strong>
 
           <br />
-          Country: {marker.country || "Unknown"}
+          Country: {getDisplayCountry(marker.country)}
 
           <br />
           City: {marker.city || "Unknown"}
@@ -491,7 +532,9 @@ export default function WorldMap() {
               </p>
               <p>
                 Recommendation:{" "}
-                <strong>Review related incidents and consider containment.</strong>
+                <strong>
+                  Review related incidents and investigate potential malicious activity.
+                </strong>
               </p>
             </>
           ) : (
@@ -506,11 +549,13 @@ export default function WorldMap() {
 
           <p>
             IP Address:{" "}
-            <strong>{selectedMarker.ip || selectedMarker.query || "::1"}</strong>
+            <strong>
+              {getPresentationIP(selectedMarker.ip || selectedMarker.query)}
+            </strong>
           </p>
 
           <p>
-            Country: <strong>{selectedMarker.country || "Unknown"}</strong>
+            Country: <strong>{getDisplayCountry(selectedMarker.country)}</strong>
           </p>
 
           <p>
@@ -559,17 +604,32 @@ export default function WorldMap() {
 
       <div style={styles.twoColumnGrid}>
         <div style={styles.panel}>
-          <h3>Observed Source IPs</h3>
+          <h3 style={styles.panelTitle}>Observed Source IPs</h3>
+          <p style={styles.panelSubtitle}>
+            Unique attack sources identified from correlated incidents
+          </p>
 
           {uniqueIPs.length > 0 ? (
             uniqueIPs.map((ip) => {
-              const marker = markers.find(
-                (m) => m.ip === ip || m.query === ip
+              const displayIP = getPresentationIP(ip);
+              const marker = validMarkers.find(
+                (m) => getPresentationIP(m.ip || m.query) === displayIP
               );
+              const relatedIncidents = marker ? getMarkerIncidents(marker) : [];
+              const country = marker
+                ? getDisplayCountry(marker.country)
+                : "GeoIP pending";
+              const severity = marker
+                ? getMarkerHighestSeverity(marker)
+                : "low";
+              const tooltip = `${displayIP}\n${country}\n${relatedIncidents.length} ${
+                relatedIncidents.length === 1 ? "incident" : "incidents"
+              }\n${severity.toUpperCase()} Risk`;
 
               return (
                 <div
                   key={ip}
+                  title={tooltip}
                   style={{
                     ...styles.ipItem,
                     cursor: "pointer",
@@ -580,7 +640,26 @@ export default function WorldMap() {
                     }
                   }}
                 >
-                  {ip}
+                  <div style={styles.ipItemTop}>
+                    <strong style={styles.ipAddress}>{displayIP}</strong>
+                    <span
+                      style={{
+                        ...styles.ipRiskBadge,
+                        color: getSeverityColor(severity),
+                        borderColor: getSeverityColor(severity),
+                      }}
+                    >
+                      {severity} risk
+                    </span>
+                  </div>
+
+                  <div style={styles.ipItemMeta}>
+                    <span>{country}</span>
+                    <span>
+                      {relatedIncidents.length}{" "}
+                      {relatedIncidents.length === 1 ? "incident" : "incidents"}
+                    </span>
+                  </div>
                 </div>
               );
             })
@@ -694,12 +773,20 @@ const styles = {
   fontWeight: "500",
 },
 
-summaryValue: {
+  summaryValue: {
   fontSize: "24px",
   margin: "10px 0 0",
   fontWeight: "700",
   color: "#f8fafc",
 },
+
+  summaryHint: {
+    display: "block",
+    marginTop: "7px",
+    color: "#94a3b8",
+    fontSize: "11px",
+    lineHeight: 1.35,
+  },
 
   twoColumnGrid: {
     display: "grid",
@@ -714,6 +801,19 @@ summaryValue: {
     borderRadius: "14px",
     padding: "14px",
     marginBottom: "14px",
+  },
+
+  mapHeader: {
+    display: "flex",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    margin: "0 0 8px",
+  },
+
+  mapHint: {
+    color: "#8aa4c2",
+    fontSize: "12px",
+    lineHeight: 1.4,
   },
 
   panelTitle: {
@@ -848,5 +948,39 @@ summaryValue: {
     background: "#1e293b",
     borderRadius: "8px",
     border: "1px solid #475569",
+  },
+
+  ipItemTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "10px",
+  },
+
+  ipAddress: {
+    color: "#f8fafc",
+    fontSize: "13px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+
+  ipRiskBadge: {
+    flexShrink: 0,
+    border: "1px solid",
+    borderRadius: "999px",
+    padding: "2px 7px",
+    fontSize: "10px",
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+
+  ipItemMeta: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginTop: "6px",
+    color: "#94a3b8",
+    fontSize: "12px",
   },
 };

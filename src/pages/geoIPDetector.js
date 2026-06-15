@@ -3,8 +3,14 @@ const LOCAL_COORDINATES = {
   longitude: 151.2093,
 };
 
+const DEMO_IP_REPLACEMENTS = {
+  "8.8.8.8": "185.22.91.10",
+};
+
 const isLocalIP = (ip) =>
   !ip ||
+  String(ip).toLowerCase() === "localhost" ||
+  String(ip).toLowerCase() === "internal network" ||
   ip === "::1" ||
   ip === "127.0.0.1" ||
   ip === "::ffff:127.0.0.1" ||
@@ -38,7 +44,8 @@ const calculateIPReputation = (ip, geoData) => {
     abuseScore: 30,
     isTor: false,
     isVpn: false,
-    recommendation: "Review related incidents and request volume.",
+    recommendation:
+      "Review related incidents and investigate potential malicious activity.",
   };
 };
 
@@ -73,26 +80,28 @@ const getGeoIP = async (ip) => {
   try {
     if (isLocalIP(ip)) {
       return buildGeoIPResult({
-        ip,
-        country: "Localhost",
-        city: "Local machine",
-        isp: "Internal",
-        org: "Development Environment",
+        ip: "Internal Network",
+        country: "Internal Network",
+        city: "Internal",
+        isp: "Internal Host",
+        org: "Internal Network",
         latitude: LOCAL_COORDINATES.latitude,
         longitude: LOCAL_COORDINATES.longitude,
         risk: "Low",
       });
     }
 
+    const lookupIP = DEMO_IP_REPLACEMENTS[ip] || ip;
+
     const response = await fetch(
-      `http://ip-api.com/json/${ip}?fields=status,query,country,city,isp,org,lat,lon`
+      `http://ip-api.com/json/${lookupIP}?fields=status,query,country,city,isp,org,lat,lon`
     );
 
     const data = await response.json();
 
     if (data.status !== "success") {
       return buildGeoIPResult({
-        ip,
+        ip: lookupIP,
         country: "Unknown",
         city: "Unknown",
         isp: "Unknown",
@@ -104,7 +113,7 @@ const getGeoIP = async (ip) => {
     }
 
     return buildGeoIPResult({
-      ip: data.query || ip,
+      ip: data.query || lookupIP,
       country: data.country || "Unknown",
       city: data.city || "Unknown",
       isp: data.isp || "Unknown",
@@ -117,7 +126,7 @@ const getGeoIP = async (ip) => {
     console.error("GeoIP lookup error:", err);
 
     return buildGeoIPResult({
-      ip,
+      ip: DEMO_IP_REPLACEMENTS[ip] || ip,
       country: "Unknown",
       city: "Unknown",
       isp: "Unknown",

@@ -1,5 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import socket from "../pages/socket";
+import goldenHorizonIcon from "../assets/golden-horizon-icon.png";
 
 
 export default function Navbar() {
@@ -19,7 +20,17 @@ export default function Navbar() {
 
   return (
   <nav style={styles.nav}>
-    <h3 style={styles.logo}>SOC Platform</h3>
+    <div style={styles.logo}>
+      <img
+        src={goldenHorizonIcon}
+        alt="Golden Horizon"
+        style={styles.logoIcon}
+      />
+      <div style={styles.logoCopy}>
+        <span style={styles.logoProduct}>SOC Platform</span>
+        <span style={styles.logoCompany}>by Golden Horizon</span>
+      </div>
+    </div>
 
     <div style={styles.links}>
       <Link
@@ -88,6 +99,7 @@ export default function Navbar() {
     </div>
   </nav>
 );
+}
 
 /* ================= STYLES ================= */
 
@@ -103,10 +115,39 @@ const styles = {
   },
 
   logo: {
-    margin: 0,
-    fontSize: "18px",
-    fontWeight: "bold",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
     color: "#f9fafb",
+  },
+
+  logoIcon: {
+    width: "58px",
+    height: "38px",
+    objectFit: "contain",
+    borderRadius: "6px",
+    flexShrink: 0,
+  },
+
+  logoCopy: {
+    display: "flex",
+    flexDirection: "column",
+    lineHeight: 1.05,
+  },
+
+  logoCompany: {
+    color: "#d9b85f",
+    fontSize: "12px",
+    fontWeight: "700",
+    letterSpacing: "0.3px",
+    whiteSpace: "nowrap",
+  },
+
+  logoProduct: {
+    color: "#f8fafc",
+    fontSize: "18px",
+    fontWeight: "800",
+    whiteSpace: "nowrap",
   },
 
   links: {

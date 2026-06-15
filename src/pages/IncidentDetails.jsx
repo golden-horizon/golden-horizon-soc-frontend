@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
+import { getPresentationIP } from "../utils/geoPresentation";
 
 
 
@@ -21,7 +23,39 @@ const [rootCause, setRootCause] = useState("");
 const [actionsTaken, setActionsTaken] = useState("");
 const [finalOutcome, setFinalOutcome] = useState("");
 const [lessonsLearned, setLessonsLearned] = useState("");
-const [closureSummary, setClosureSummary] = useState(null);
+const [, setClosureSummary] = useState(null);
+
+  const loadIncident = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await axios.get("http://localhost:5000/incidents", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const allIncidents = Array.isArray(res.data) ? res.data : [];
+
+      const selected = allIncidents.find(
+        (item) => String(item.id) === String(id)
+      );
+
+      setIncident(selected || null);
+
+      if (selected?.source_ip) {
+        const related = allIncidents.filter(
+          (item) =>
+            item.source_ip === selected.source_ip &&
+            String(item.id) !== String(id)
+        );
+
+        setRelatedIncidents(related);
+      }
+    } catch (err) {
+      console.error("Failed to load incident details:", err);
+    }
+  }, [id]);
 
   useEffect(() => {
   loadIncident();
@@ -59,38 +93,7 @@ if (existingClosure) {
   setFinalOutcome(existingClosure.finalOutcome || "");
   setLessonsLearned(existingClosure.lessonsLearned || "");
 }
-}, [id]);
-  const loadIncident = async () => {
-    try {
-      const token = localStorage.getItem("token");
-
-      const res = await axios.get("http://localhost:5000/incidents", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const allIncidents = Array.isArray(res.data) ? res.data : [];
-
-      const selected = allIncidents.find(
-        (item) => String(item.id) === String(id)
-      );
-
-      setIncident(selected || null);
-
-      if (selected?.source_ip) {
-        const related = allIncidents.filter(
-          (item) =>
-            item.source_ip === selected.source_ip &&
-            String(item.id) !== String(id)
-        );
-
-        setRelatedIncidents(related);
-      }
-    } catch (err) {
-      console.error("Failed to load incident details:", err);
-    }
-  };
+}, [id, loadIncident]);
 
   if (!incident) {
     return (
@@ -318,51 +321,6 @@ const saveClosureSummary = () => {
     `closure-${id}`,
     JSON.stringify(summary)
   );
-};
-//PDF Incident Report
-const exportIncidentReport = () => {
-  const doc = new jsPDF();
-
-  doc.setFontSize(18);
-  doc.text("Incident Report", 20, 20);
-
-  doc.setFontSize(12);
-  doc.text(`Title: ${incident.title}`, 20, 35);
-  doc.text(`Severity: ${incident.severity}`, 20, 45);
-  doc.text(`Status: ${incident.status}`, 20, 55);
-  doc.text(`Source IP: ${incident.source_ip || "N/A"}`, 20, 65);
-  doc.text(
-    `Created: ${new Date(incident.created_at).toLocaleString()}`,
-    20,
-    75
-  );
-
-  doc.text("Description:", 20, 90);
-  doc.text(incident.description || "No description", 20, 100, {
-    maxWidth: 170,
-  });
-
-  doc.text("MITRE ATT&CK:", 20, 125);
-
-  incidentMitre.forEach((item, index) => {
-    doc.text(
-      `${item.id} - ${item.name}`,
-      20,
-      135 + index * 10
-    );
-  });
-
-  doc.text("Attack Timeline:", 20, 165);
-
-  attackTimeline.slice(0, 5).forEach((event, index) => {
-    doc.text(
-      `${event.title} - ${event.severity}`,
-      20,
-      175 + index * 10
-    );
-  });
-
-  doc.save(`incident-report-${incident.id}.pdf`);
 };
   return (
     <div style={styles.page}>
@@ -616,11 +574,19 @@ const exportIncidentReport = () => {
           relatedIncidents.map((item) => (
             <div key={item.id} style={styles.relatedItem}>
               <strong>{item.title}</strong>
-              <span>{item.severity}</span>
-              <small>{item.status}</small>
+              <span>
+                Source IP: <strong>{getPresentationIP(item.source_ip) || "N/A"}</strong>
+              </span>
+              <span>
+                Status: <strong>{item.status || "Unknown"}</strong>
+              </span>
+              <small>
+                Created:{" "}
+                {item.created_at
+                  ? new Date(item.created_at).toLocaleString()
+                  : "Unknown"}
+              </small>
             </div>
-
-       
           ))
         ) : (
           <p>No related incidents found.</p>

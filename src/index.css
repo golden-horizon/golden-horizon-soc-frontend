@@ -156,8 +156,62 @@ code {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.22);
 }
 
+.auth-input {
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.auth-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+  background: #08142a !important;
+}
+
+.auth-button,
+.auth-secondary-button,
+.auth-password-toggle {
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    filter 120ms ease,
+    background-color 120ms ease;
+}
+
+.auth-button:hover:not(:disabled),
+.auth-secondary-button:hover:not(:disabled),
+.auth-password-toggle:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.auth-password-toggle:hover:not(:disabled) {
+  border-color: #3b82f6 !important;
+}
+
+.auth-button:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.72;
+}
+
+.critical-finding-pulse {
+  animation: criticalPulse 1s ease-in-out 5;
+}
+
+.risk-score-fill {
+  animation: riskFill 700ms ease-out;
+  transform-origin: left center;
+}
+
 .soc-top-source-card {
   grid-column: span 4;
+}
+
+@media (max-width: 980px) {
+  .investigation-main-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 @media (max-width: 1200px) {
@@ -185,6 +239,27 @@ code {
 
   to {
     stroke-dashoffset: -22;
+  }
+}
+
+@keyframes criticalPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.14);
+  }
+
+  50% {
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.42);
+  }
+}
+
+@keyframes riskFill {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
   }
 }
 

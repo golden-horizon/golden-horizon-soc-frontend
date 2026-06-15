@@ -14,6 +14,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { toast } from "react-toastify";
+import {
+  getPresentationIP,
+  isGeoIPVisualizationIP,
+} from "../utils/geoPresentation";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -136,9 +140,10 @@ export default function Dashboard() {
   const normalise = (value) => (value || "").toLowerCase();
 
   const ipCounts = incidents.reduce((acc, incident) => {
-    if (!incident.source_ip) return acc;
+    if (!isGeoIPVisualizationIP(incident.source_ip)) return acc;
 
-    acc[incident.source_ip] = (acc[incident.source_ip] || 0) + 1;
+    const ip = getPresentationIP(incident.source_ip);
+    acc[ip] = (acc[ip] || 0) + 1;
     return acc;
   }, {});
 

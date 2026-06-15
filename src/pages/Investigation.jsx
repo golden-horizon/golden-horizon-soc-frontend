@@ -1,687 +1,1023 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import socket from "./socket";
+import {
+  getDisplayCountry,
+  getPresentationIP,
+} from "../utils/geoPresentation";
 
-export default function Investigation() {
-  const [activities, setActivities] = useState([]);
-  const [ipFilter, setIpFilter] = useState("");
-  const [userFilter, setUserFilter] = useState("");
-  const [selectedIP, setSelectedIP] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [incidents, setIncidents] = useState([]);
-  const [geoData, setGeoData] = useState(null);
+const API = "http://localhost:5000";
 
-  useEffect(() => {
-  loadActivity();
-  loadIncidents();
-}, []);
+const normalise = (value) => (value || "").toString().toLowerCase();
 
-  const loadActivity = async () => {
-    try {
-      const token = localStorage.getItem("token");
+const getSeverityStyle = (severity) => {
+  const level = normalise(severity);
 
-      console.log("TOKEN:", token);
+  if (level === "critical") return { borderColor: "#ef4444", color: "#fecaca" };
+  if (level === "high") return { borderColor: "#f97316", color: "#fed7aa" };
+  if (level === "medium") return { borderColor: "#eab308", color: "#fef08a" };
+  if (level === "low") return { borderColor: "#22c55e", color: "#bbf7d0" };
 
-      const res = await axios.get(
-        "http://localhost:5000/login-activity",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-        
-      );
+  return { borderColor: "#64748b", color: "#cbd5e1" };
+};
 
-      console.log("LOGIN ACTIVITY RESPONSE:", res.data);
+const getTypeStyle = (type) => {
+  if (type === "Incident") return { borderColor: "#ef4444", color: "#fecaca" };
+  if (type === "Security Event") return { borderColor: "#eab308", color: "#fef08a" };
+  if (type === "Failed Login") return { borderColor: "#3b82f6", color: "#bfdbfe" };
 
-      setActivities(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error("Failed to load login activity:", err);
-      console.error("STATUS:", err.response?.status);
-      console.error("DATA:", err.response?.data);
-    } finally {
-      setLoading(false);
-    }
+  return { borderColor: "#64748b", color: "#cbd5e1" };
+};
+
+const getMitreTechnique = (item) => {
+  const text = normalise(
+    `${item.title || ""} ${item.description || ""} ${item.event_type || ""} ${
+      item.category || ""
+    } ${item.mitre_technique || ""}`
+  );
+
+  if (item.mitre_technique) return item.mitre_technique;
+  if (text.includes("brute")) return "T1110";
+  if (text.includes("sql") || text.includes("api abuse")) return "T1190";
+  if (text.includes("xss")) return "T1059";
+  if (text.includes("session hijack")) return "T1539";
+
+  return "N/A";
+};
+
+const getMitreName = (technique) => {
+  const names = {
+    T1110: "Brute Force",
+    T1190: "Exploit Public-Facing Application",
+    T1059: "Command and Scripting Interpreter",
+    T1539: "Steal Web Session Cookie",
   };
-  const loadIncidents = async () => {
-  try {
-    const token = localStorage.getItem("token");
 
-    const res = await axios.get("http://localhost:5000/incidents", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    setIncidents(Array.isArray(res.data) ? res.data : []);
-  } catch (err) {
-    console.error("Failed to load related incidents:", err);
-  }
+  return names[technique] || "Unmapped Technique";
 };
 
-  const filtered = activities.filter((item) => {
-    const ipMatch =
-      !ipFilter ||
-      item.ip_address?.toLowerCase().includes(ipFilter.toLowerCase());
+const getMitreTactic = (technique) => {
+  const tactics = {
+    T1110: "Credential Access",
+    T1190: "Initial Access",
+    T1059: "Execution",
+    T1539: "Credential Access",
+  };
 
-    const userMatch =
-      !userFilter ||
-      item.username?.toLowerCase().includes(userFilter.toLowerCase());
-
-    return ipMatch && userMatch;
-  });
-
-  const uniqueIPs = [...new Set(activities.map((a) => a.ip_address))];
-  const uniqueUsers = [...new Set(activities.map((a) => a.username))];
-
-  const selectedActivities = selectedIP
-    ? activities.filter((a) => a.ip_address === selectedIP)
-    : [];
-
-    const relatedIncidents = selectedIP
-  ? incidents.filter((incident) =>
-      incident.description
-        ?.toLowerCase()
-        .includes(selectedIP.toLowerCase())
-    )
-  : [];
-   const attackTypes = [];
-
-if (relatedIncidents.some((i) => i.title?.includes("Brute Force"))) {
-  attackTypes.push("Brute Force");
-}
-
-if (relatedIncidents.some((i) => i.title?.includes("SQL Injection"))) {
-  attackTypes.push("SQL Injection");
-}
-
-if (relatedIncidents.some((i) => i.title?.includes("XSS"))) {
-  attackTypes.push("XSS");
-}
-
-if (relatedIncidents.some((i) => i.title?.includes("API Abuse"))) {
-  attackTypes.push("API Abuse");
-}
-
-const correlationAlerts = relatedIncidents.filter((i) =>
-  i.title?.includes("Multi-Vector")
-);
-  const selectedUsers = [
-    ...new Set(selectedActivities.map((a) => a.username)),
-  ];
-  const getRiskLevel = (count) => {
-  if (count >= 20) return "Critical";
-  if (count >= 10) return "High";
-  if (count >= 5) return "Medium";
-  return "Low";
+  return tactics[technique] || "Technique";
 };
 
-const riskLevel = getRiskLevel(selectedActivities.length)
+const getCountryFlag = (country) => {
+  const countryCodes = {
+    "north korea": "KP",
+    russia: "RU",
+    china: "CN",
+    iran: "IR",
+    "united states": "US",
+  };
+  const code = countryCodes[normalise(country)];
 
-  const firstSeen =
-    selectedActivities.length > 0
-      ? selectedActivities[selectedActivities.length - 1].attempt_time
-      : null;
+  if (!code) return "";
 
-  const lastSeen =
-    selectedActivities.length > 0
-      ? selectedActivities[0].attempt_time
-      : null;
-  const attackTimeline = [...relatedIncidents].sort(
-  (a, b) => new Date(a.created_at) - new Date(b.created_at)
-);
-  
-  const criticalCount = relatedIncidents.filter(
-  (i) => i.severity === "critical"
-).length;
+  return code
+    .toUpperCase()
+    .replace(/./g, (char) =>
+      String.fromCodePoint(127397 + char.charCodeAt(0))
+    );
+};
 
-const highCount = relatedIncidents.filter(
-  (i) => i.severity === "high"
-).length;
+const getThreatClassification = (geoData, riskLevel) => {
+  const country = normalise(geoData?.country);
+  const isHighRiskCountry = highRiskCountries.includes(country);
+  const isInternal =
+    country === "localhost" ||
+    country === "internal network" ||
+    normalise(geoData?.isp) === "internal" ||
+    normalise(geoData?.isp) === "internal host" ||
+    normalise(geoData?.org).includes("development");
 
-//Threat Intelligence Panel
-const getIPIntel = (ip) => {
-  if (!ip) {
+  if (isInternal) {
     return {
-      type: "Unknown",
-      classification: "No IP selected",
-      risk: "Unknown",
-      location: "Unknown",
-    };
-  }
-
-  if (ip === "::1" || ip === "127.0.0.1") {
-    return {
-      type: "Localhost",
-      classification: "Internal testing address",
-      risk: "Low",
-      location: "Local machine",
-    };
-  }
-
-  if (
-    ip.startsWith("192.168.") ||
-    ip.startsWith("10.") ||
-    ip.startsWith("172.16.") ||
-    ip.startsWith("172.17.") ||
-    ip.startsWith("172.18.") ||
-    ip.startsWith("172.19.") ||
-    ip.startsWith("172.20.") ||
-    ip.startsWith("172.21.") ||
-    ip.startsWith("172.22.") ||
-    ip.startsWith("172.23.") ||
-    ip.startsWith("172.24.") ||
-    ip.startsWith("172.25.") ||
-    ip.startsWith("172.26.") ||
-    ip.startsWith("172.27.") ||
-    ip.startsWith("172.28.") ||
-    ip.startsWith("172.29.") ||
-    ip.startsWith("172.30.") ||
-    ip.startsWith("172.31.")
-  ) {
-    return {
-      type: "Private Network",
-      classification: "Internal network address",
-      risk: "Low",
-      location: "Private LAN",
-    };
-  }
-
-  if (ip.startsWith("203.0.113.")) {
-    return {
-      type: "Reserved Test IP",
-      classification: "Documentation/test address",
-      risk: "Low",
-      location: "Reserved example range",
+      classification: "Internal Lab Traffic",
+      confidence: "Medium",
     };
   }
 
   return {
-    type: "Public IP",
-    classification: "External source",
-    risk: "High",
-    location: "Unknown public location",
+    classification: "External Threat",
+    confidence: riskLevel === "Critical" || isHighRiskCountry ? "High" : "Medium",
   };
 };
-const ipIntel = getIPIntel(selectedIP);
 
-//MITRE ATT&CK Mapping
+const getItemTime = (item) =>
+  item.timestamp || item.created_at || item.attempt_time || item.time || null;
 
-const mitreMappings = [];
+const formatDate = (value) => {
+  if (!value) return "N/A";
+  return new Date(value).toLocaleString();
+};
 
-if (attackTypes.includes("Brute Force")) {
-  mitreMappings.push({
-    technique: "T1110",
-    name: "Brute Force",
-  });
-}
+const highRiskCountries = ["north korea", "russia", "iran", "china"];
 
-if (attackTypes.includes("SQL Injection")) {
-  mitreMappings.push({
-    technique: "T1190",
-    name: "Exploit Public-Facing Application",
-  });
-}
+const calculateLocalRisk = ({ incidents, securityEvents, failedLogins, geoData }) => {
+  const criticalIncidents = incidents.filter(
+    (item) => item.severity === "critical"
+  ).length;
+  const highIncidents = incidents.filter((item) => item.severity === "high").length;
+  const criticalEvents = securityEvents.filter(
+    (item) => item.severity === "critical"
+  ).length;
+  const highEvents = securityEvents.filter((item) => item.severity === "high").length;
+  const eventCategories = new Set(
+    securityEvents.map((item) => item.category || item.event_type).filter(Boolean)
+  );
+  const hasMultiVector = [...incidents, ...securityEvents].some((item) =>
+    normalise(`${item.title || ""} ${item.description || ""} ${item.event_type || ""}`)
+      .includes("multi-vector")
+  );
+  const country = normalise(geoData?.country);
+  const isHighRiskCountry = highRiskCountries.includes(country);
 
-if (attackTypes.includes("XSS")) {
-  mitreMappings.push({
-    technique: "T1059",
-    name: "Command and Scripting Interpreter",
-  });
-}
-if (attackTypes.includes("API Abuse")) {
-  mitreMappings.push({
-    technique: "T1190",
-    name: "Exploit Public-Facing Application",
-  });
-}
+  let riskScore =
+    criticalIncidents * 18 +
+    highIncidents * 10 +
+    criticalEvents * 14 +
+    highEvents * 8 +
+    Math.min(failedLogins.length * 3, 24) +
+    Math.max(eventCategories.size - 1, 0) * 10;
 
-//Connect GeoIP
-const loadGeoIP = async (ip) => {
-  try {
-    const token = localStorage.getItem("token");
-
-    const res = await axios.get(
-      `http://localhost:5000/geoip/${ip}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    setGeoData(res.data);
-  } catch (err) {
-    console.error("GeoIP lookup failed:", err);
+  if (hasMultiVector) riskScore += 25;
+  if (isHighRiskCountry) riskScore += 20;
+  if (isHighRiskCountry && (criticalIncidents > 0 || criticalEvents > 0)) {
+    riskScore += 15;
   }
+  if (incidents.length >= 10) riskScore += 20;
+  if (securityEvents.length >= 5) riskScore += 10;
+
+  riskScore = Math.min(Math.round(riskScore), 100);
+
+  const riskLevel =
+    riskScore >= 80
+      ? "Critical"
+      : riskScore >= 60
+      ? "High"
+      : riskScore >= 30
+      ? "Medium"
+      : "Low";
+
+  const actions = [];
+
+  if (riskScore >= 80) actions.push("Block IP or apply temporary deny rule.");
+  if (criticalIncidents > 0 || criticalEvents > 0) {
+    actions.push("Investigate critical incidents and confirm affected assets.");
+  }
+  if (securityEvents.some((item) => normalise(item.event_type).includes("sql"))) {
+    actions.push("Review web logs and validate input filtering controls.");
+  }
+  if (failedLogins.length >= 5) {
+    actions.push("Check affected accounts and failed authentication patterns.");
+  }
+  if (isHighRiskCountry) {
+    actions.push(`Review geo-risk context for ${geoData.country}.`);
+  }
+  if (actions.length === 0) {
+    actions.push("Monitor source activity and retain evidence for trend analysis.");
+  }
+
+  return {
+    riskScore,
+    riskLevel,
+    recommendation: actions[0],
+    actions,
+  };
 };
 
-//Threat Reputation Scoring
-let reputationScore = 0;
+const getAttackStage = (item) => {
+  const text = normalise(
+    `${item.title || ""} ${item.description || ""} ${item.event_type || ""} ${
+      item.category || ""
+    }`
+  );
 
-if (attackTypes.includes("Brute Force")) reputationScore += 20;
-if (attackTypes.includes("SQL Injection")) reputationScore += 30;
-if (attackTypes.includes("XSS")) reputationScore += 25;
-if (attackTypes.includes("API Abuse")) reputationScore += 20;
+  if (text.includes("recon")) return "Reconnaissance Activity";
+  if (text.includes("brute") || text.includes("failed")) return "Credential Access";
+  if (text.includes("sql")) return "SQL Injection";
+  if (text.includes("xss")) return "Cross-Site Scripting";
+  if (text.includes("api")) return "API Abuse";
+  if (text.includes("session")) return "Session Hijacking";
+  if (text.includes("multi-vector")) return "Multi-Vector Attack";
 
-if (
-  relatedIncidents.some((i) =>
-    i.title?.includes("Session Hijacking")
-  )
-) {
-  reputationScore += 40;
-}
-
-if (correlationAlerts.length > 0) reputationScore += 25;
-if (criticalCount > 0) reputationScore += criticalCount * 10;
-if (highCount > 0) reputationScore += highCount * 5;
-
-if (reputationScore > 100) reputationScore = 100;
-
-const getReputationLevel = (score) => {
-  if (score >= 80) return "Critical";
-  if (score >= 60) return "High";
-  if (score >= 30) return "Medium";
-  return "Low";
+  return item.title || item.event_type || "Suspicious Activity";
 };
 
-const reputationLevel = getReputationLevel(reputationScore);
+export default function Investigation() {
+  const [failedLogins, setFailedLogins] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+  const [securityEvents, setSecurityEvents] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [selectedIP, setSelectedIP] = useState(null);
+  const [ipInvestigation, setIpInvestigation] = useState(null);
+  const [activeInvestigationTab, setActiveInvestigationTab] = useState("summary");
+  const [loading, setLoading] = useState(true);
+  const [ipLoading, setIpLoading] = useState(false);
+  const [geoData, setGeoData] = useState(null);
+  const [criticalToast, setCriticalToast] = useState(null);
+  const [criticalPulse, setCriticalPulse] = useState(false);
+  const [filters, setFilters] = useState({
+    ip: "",
+    username: "",
+    severity: "all",
+    attack: "",
+    mitre: "",
+  });
 
-//Threat Recommendations.
-const recommendations = [];
+  const authHeaders = useCallback(() => {
+    const token = localStorage.getItem("token");
+    return { Authorization: `Bearer ${token}` };
+  }, []);
 
-if (attackTypes.includes("Brute Force")) {
-  recommendations.push(
-    "Review failed login attempts and consider account lockout policies."
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const [loginRes, incidentRes, eventRes, summaryRes] = await Promise.allSettled([
+        axios.get(`${API}/login-activity`, { headers: authHeaders() }),
+        axios.get(`${API}/incidents`, { headers: authHeaders() }),
+        axios.get(`${API}/security-events`, { headers: authHeaders() }),
+        axios.get(`${API}/investigation/summary`, { headers: authHeaders() }),
+      ]);
+
+      const loginData =
+        loginRes.status === "fulfilled" && Array.isArray(loginRes.value.data)
+          ? loginRes.value.data
+          : [];
+      const incidentData =
+        incidentRes.status === "fulfilled" && Array.isArray(incidentRes.value.data)
+          ? incidentRes.value.data
+          : [];
+      const eventData =
+        eventRes.status === "fulfilled" && Array.isArray(eventRes.value.data)
+          ? eventRes.value.data
+          : [];
+
+      setFailedLogins(loginData);
+      setIncidents(incidentData);
+      setSecurityEvents(eventData);
+      setSummary(
+        summaryRes.status === "fulfilled"
+          ? summaryRes.value.data
+          : {
+              totalIncidents: incidentData.length,
+              securityEvents: eventData.length,
+              failedLogins: loginData.length,
+              uniqueSourceIPs: [
+                ...new Set(
+                  [
+                    ...incidentData.map((item) => item.source_ip),
+                    ...eventData.map((item) => item.source_ip),
+                    ...loginData.map((item) => item.ip_address),
+                  ]
+                    .filter(Boolean)
+                    .map(getPresentationIP)
+                ),
+              ].length,
+              criticalAlerts:
+                incidentData.filter((item) => item.severity === "critical").length +
+                eventData.filter((item) => item.severity === "critical").length,
+            }
+      );
+    } catch (err) {
+      console.error("Failed to load investigation data:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [authHeaders]);
+
+  const loadIPInvestigation = useCallback(
+    async (ip) => {
+      if (!ip) return;
+
+      try {
+        setSelectedIP(ip);
+        setActiveInvestigationTab("summary");
+        setIpLoading(true);
+        setGeoData(null);
+
+        const [investigationRes, geoRes] = await Promise.allSettled([
+          axios.get(`${API}/investigation/ip/${encodeURIComponent(ip)}`, {
+            headers: authHeaders(),
+          }),
+          axios.get(`${API}/geoip/${encodeURIComponent(ip)}`, {
+            headers: authHeaders(),
+          }),
+        ]);
+
+        if (investigationRes.status === "fulfilled") {
+          setIpInvestigation(investigationRes.value.data);
+        }
+
+        if (geoRes.status === "fulfilled") {
+          setGeoData(geoRes.value.data);
+        }
+      } catch (err) {
+        console.error("Failed to load IP investigation:", err);
+      } finally {
+        setIpLoading(false);
+      }
+    },
+    [authHeaders]
   );
-}
 
-if (attackTypes.includes("SQL Injection")) {
-  recommendations.push(
-    "Inspect application input validation and review database logs."
-  );
-}
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData();
+  }, [loadData]);
 
-if (attackTypes.includes("XSS")) {
-  recommendations.push(
-    "Review input sanitisation and output encoding controls."
-  );
-}
+  useEffect(() => {
+    const handleCriticalIncident = (incident) => {
+      if (normalise(incident?.severity) !== "critical") return;
 
-if (attackTypes.includes("API Abuse")) {
-  recommendations.push(
-    "Review API rate limiting and unusual request patterns."
-  );
-}
+      setCriticalToast(incident);
+      setCriticalPulse(true);
 
-if (relatedIncidents.some((i) => i.title?.includes("Session Hijacking"))) {
-  recommendations.push(
-    "Invalidate active sessions and investigate token misuse."
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioContext = new AudioContext();
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+        gain.gain.setValueAtTime(0.04, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.35);
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.35);
+      } catch (err) {
+        console.debug("Critical alert sound blocked:", err);
+      }
+
+      window.setTimeout(() => {
+        setCriticalToast(null);
+        setCriticalPulse(false);
+      }, 5000);
+    };
+
+    socket.on("incident-created", handleCriticalIncident);
+
+    return () => {
+      socket.off("incident-created", handleCriticalIncident);
+    };
+  }, []);
+
+  const timeline = useMemo(() => {
+    const loginItems = failedLogins.map((item) => ({
+      id: `login-${item.id}`,
+      raw: item,
+      type: "Failed Login",
+      title: "Failed Login Attempt",
+      severity: "medium",
+      sourceIP: item.ip_address,
+      username: item.username,
+      timestamp: item.attempt_time,
+      mitre: "T1110",
+      description: `Failed authentication for ${item.username || "unknown user"}`,
+    }));
+
+    const incidentItems = incidents.map((item) => ({
+      id: `incident-${item.id}`,
+      raw: item,
+      type: "Incident",
+      title: item.title || "Incident",
+      severity: item.severity || "low",
+      sourceIP: item.source_ip,
+      username: item.username,
+      timestamp: item.created_at,
+      mitre: getMitreTechnique(item),
+      description: item.description,
+    }));
+
+    const eventItems = securityEvents.map((item) => ({
+      id: `event-${item.id}`,
+      raw: item,
+      type: "Security Event",
+      title: item.event_type || item.category || "Security Event",
+      severity: item.severity || "low",
+      sourceIP: item.source_ip,
+      username: item.username,
+      timestamp: item.created_at,
+      mitre: getMitreTechnique(item),
+      description: item.description || item.endpoint,
+    }));
+
+    return [...loginItems, ...incidentItems, ...eventItems].sort(
+      (a, b) => new Date(getItemTime(b)) - new Date(getItemTime(a))
+    );
+  }, [failedLogins, incidents, securityEvents]);
+
+  const filteredTimeline = useMemo(
+    () =>
+      timeline.filter((item) => {
+        const ipMatch =
+          !filters.ip || normalise(item.sourceIP).includes(normalise(filters.ip));
+        const userMatch =
+          !filters.username ||
+          normalise(item.username).includes(normalise(filters.username));
+        const severityMatch =
+          filters.severity === "all" ||
+          normalise(item.severity) === filters.severity;
+        const attackMatch =
+          !filters.attack ||
+          normalise(`${item.title} ${item.description}`).includes(
+            normalise(filters.attack)
+          );
+        const mitreMatch =
+          !filters.mitre || normalise(item.mitre).includes(normalise(filters.mitre));
+
+        return ipMatch && userMatch && severityMatch && attackMatch && mitreMatch;
+      }),
+    [filters, timeline]
   );
-}
+
+  const aggregatedTimeline = useMemo(() => {
+    const groups = new Map();
+
+    filteredTimeline.forEach((item) => {
+      const key = [
+        item.type,
+        item.title,
+        item.sourceIP || "no-ip",
+        item.username || "no-user",
+        item.mitre,
+        item.severity,
+      ].join("|");
+      const existing = groups.get(key);
+
+      if (!existing) {
+        groups.set(key, { ...item, count: 1, children: [item] });
+        return;
+      }
+
+      existing.count += 1;
+      existing.children.push(item);
+
+      if (new Date(item.timestamp) > new Date(existing.timestamp)) {
+        existing.timestamp = item.timestamp;
+        existing.raw = item.raw;
+        existing.id = item.id;
+      }
+    });
+
+    return [...groups.values()].sort(
+      (a, b) => new Date(getItemTime(b)) - new Date(getItemTime(a))
+    );
+  }, [filteredTimeline]);
+
+  const uniqueSourceIPs = useMemo(
+    () => [
+      ...new Set(
+        timeline
+          .map((item) => item.sourceIP)
+          .filter(Boolean)
+          .map(getPresentationIP)
+      ),
+    ],
+    [timeline]
+  );
+
+  const criticalAlerts = useMemo(
+    () => timeline.filter((item) => item.severity === "critical").length,
+    [timeline]
+  );
+
+  const localIPDetails = useMemo(() => {
+    if (!selectedIP) {
+      return { incidents: [], securityEvents: [], failedLogins: [] };
+    }
+
+    return {
+      incidents: incidents.filter(
+        (item) =>
+          item.source_ip === selectedIP ||
+          normalise(item.description).includes(normalise(selectedIP))
+      ),
+      securityEvents: securityEvents.filter((item) => item.source_ip === selectedIP),
+      failedLogins: failedLogins.filter((item) => item.ip_address === selectedIP),
+    };
+  }, [failedLogins, incidents, securityEvents, selectedIP]);
+
+  const selectedDetails = useMemo(() => {
+    const incidentsForIP = ipInvestigation?.incidents || localIPDetails.incidents;
+    const eventsForIP = ipInvestigation?.securityEvents || localIPDetails.securityEvents;
+    const loginsForIP = ipInvestigation?.failedLogins || localIPDetails.failedLogins;
+    const localRisk = calculateLocalRisk({
+      incidents: incidentsForIP,
+      securityEvents: eventsForIP,
+      failedLogins: loginsForIP,
+      geoData,
+    });
+
+    return {
+      ip: selectedIP,
+      incidents: incidentsForIP,
+      securityEvents: eventsForIP,
+      failedLogins: loginsForIP,
+      riskScore: Math.max(ipInvestigation?.riskScore || 0, localRisk.riskScore),
+      riskLevel:
+        localRisk.riskScore > (ipInvestigation?.riskScore || 0)
+          ? localRisk.riskLevel
+          : ipInvestigation?.riskLevel || localRisk.riskLevel,
+      recommendation: localRisk.recommendation,
+      actions: localRisk.actions,
+    };
+  }, [geoData, ipInvestigation, localIPDetails, selectedIP]);
+
+  const relatedMitre = useMemo(() => {
+    const items = [
+      ...(selectedDetails.incidents || []),
+      ...(selectedDetails.securityEvents || []),
+      ...(selectedDetails.failedLogins || []),
+    ];
+
+    return [
+      ...new Map(
+        items.map((item) => {
+          const technique = getMitreTechnique(item);
+          return [
+            technique,
+            {
+              technique,
+              tactic: getMitreTactic(technique),
+              name: getMitreName(technique),
+            },
+          ];
+        })
+      ).values(),
+    ].filter((item) => item.technique !== "N/A");
+  }, [selectedDetails]);
+
+  const threatClassification = useMemo(
+    () => getThreatClassification(geoData, selectedDetails.riskLevel),
+    [geoData, selectedDetails.riskLevel]
+  );
+
+  const attackChain = useMemo(() => {
+    const items = [
+      ...(selectedDetails.failedLogins || []).map((item) => ({
+        ...item,
+        title: "Failed Login Attempt",
+      })),
+      ...(selectedDetails.securityEvents || []),
+      ...(selectedDetails.incidents || []),
+    ].sort((a, b) => new Date(getItemTime(a)) - new Date(getItemTime(b)));
+    const seen = new Set();
+
+    return items
+      .map((item) => getAttackStage(item))
+      .filter((stage) => {
+        if (seen.has(stage)) return false;
+        seen.add(stage);
+        return true;
+      })
+      .slice(0, 5);
+  }, [selectedDetails]);
+
+  const updateFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      ip: "",
+      username: "",
+      severity: "all",
+      attack: "",
+      mitre: "",
+    });
+  };
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.title}>Investigation Center</h1>
-
       <p style={styles.subtitle}>
-        Review failed login activity, source IPs, targeted users, and
-        suspicious authentication patterns.
+        Correlate failed logins, incidents, security events, source IPs, and
+        MITRE mappings in one analyst investigation view.
       </p>
 
       <div style={styles.statsGrid}>
         <div style={styles.statCard}>
-          <span>Total Failed Logins</span>
-          <strong>{activities.length}</strong>
+          <span style={styles.statLabel}>Total Incidents</span>
+          <strong style={styles.statValue}>
+            {summary?.totalIncidents ?? incidents.length}
+          </strong>
         </div>
 
         <div style={styles.statCard}>
-          <span>Unique IPs</span>
-          <strong>{uniqueIPs.length}</strong>
+          <span style={styles.statLabel}>Security Events</span>
+          <strong style={styles.statValue}>
+            {summary?.securityEvents ?? securityEvents.length}
+          </strong>
         </div>
 
         <div style={styles.statCard}>
-          <span>Targeted Users</span>
-          <strong>{uniqueUsers.length}</strong>
+          <span style={styles.statLabel}>Failed Logins</span>
+          <strong style={styles.statValue}>
+            {summary?.failedLogins ?? failedLogins.length}
+          </strong>
         </div>
 
         <div style={styles.statCard}>
-          <span>Latest Attempt</span>
-          <strong>
-            {activities[0]
-              ? new Date(
-                  activities[0].attempt_time
-                ).toLocaleTimeString()
-              : "N/A"}
+          <span style={styles.statLabel}>Unique Source IPs</span>
+          <strong style={styles.statValue}>
+            {summary?.uniqueSourceIPs ?? uniqueSourceIPs.length}
+          </strong>
+        </div>
+
+        <div
+          className={criticalPulse ? "critical-finding-pulse" : ""}
+          style={{ ...styles.statCard, ...styles.criticalFindingCard }}
+        >
+          <span style={styles.statLabel}>Critical Findings</span>
+          <strong style={styles.statValue}>
+            {summary?.criticalAlerts ?? criticalAlerts}
           </strong>
         </div>
       </div>
 
+      {criticalToast && (
+        <div style={styles.criticalToast}>
+          <strong>New Critical Alert</strong>
+          <span>{criticalToast.title || "Critical incident created"}</span>
+        </div>
+      )}
+
       <div style={styles.filters}>
         <input
           style={styles.input}
-          placeholder="Filter by IP"
-          value={ipFilter}
-          onChange={(e) => setIpFilter(e.target.value)}
+          placeholder="IP address"
+          value={filters.ip}
+          onChange={(e) => updateFilter("ip", e.target.value)}
         />
 
         <input
           style={styles.input}
-          placeholder="Filter by Username"
-          value={userFilter}
-          onChange={(e) => setUserFilter(e.target.value)}
+          placeholder="Username"
+          value={filters.username}
+          onChange={(e) => updateFilter("username", e.target.value)}
         />
 
-        <button
-          style={styles.clearBtn}
-          onClick={() => {
-            setIpFilter("");
-            setUserFilter("");
-            setSelectedIP(null);
-             setGeoData(null);
-
-          }}
+        <select
+          style={styles.input}
+          value={filters.severity}
+          onChange={(e) => updateFilter("severity", e.target.value)}
         >
+          <option value="all">All Severities</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+
+        <input
+          style={styles.input}
+          placeholder="Attack type / title"
+          value={filters.attack}
+          onChange={(e) => updateFilter("attack", e.target.value)}
+        />
+
+        <input
+          style={styles.input}
+          placeholder="MITRE technique"
+          value={filters.mitre}
+          onChange={(e) => updateFilter("mitre", e.target.value)}
+        />
+
+        <button style={styles.clearBtn} onClick={clearFilters}>
           Clear
         </button>
       </div>
 
-      <div style={styles.mainGrid}>
-        <div style={styles.tableBox}>
-          <h3 style={styles.panelTitle}>
-            Login Activity Timeline
-          </h3>
+      <div className="investigation-main-grid" style={styles.mainGrid}>
+        <div style={styles.timelinePanel}>
+          <div style={styles.panelHeader}>
+            <h3 style={styles.panelTitle}>Investigation Timeline</h3>
+            <span style={styles.panelMeta}>
+              {filteredTimeline.length} events / {aggregatedTimeline.length} groups
+            </span>
+          </div>
 
           {loading ? (
-            <p style={styles.loading}>
-              Loading investigation data...
-            </p>
+            <p style={styles.emptyText}>Loading investigation data...</p>
+          ) : aggregatedTimeline.length === 0 ? (
+            <p style={styles.emptyText}>No timeline items match the filters.</p>
           ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>ID</th>
-                  <th style={styles.th}>IP Address</th>
-                  <th style={styles.th}>Username</th>
-                  <th style={styles.th}>Time</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filtered.map((row) => (
-                  <tr
-                    key={row.id}
+            <div style={styles.timelineList}>
+              {aggregatedTimeline.map((item) => (
+                <button
+                  key={`${item.id}-${item.count}`}
+                  type="button"
+                  style={{
+                    ...styles.timelineItem,
+                    borderColor:
+                      selectedIP === item.sourceIP ? "#3b82f6" : "#263244",
+                    background:
+                      selectedIP === item.sourceIP ? "#0f1a33" : "#111827",
+                  }}
+                  onClick={() => item.sourceIP && loadIPInvestigation(item.sourceIP)}
+                >
+                  <span
                     style={{
-                      ...styles.tr,
-                      background:
-                        selectedIP === row.ip_address
-                          ? "#1e3a8a"
-                          : "transparent",
+                      ...styles.timelineDot,
+                      borderColor: getTypeStyle(item.type).borderColor,
+                      boxShadow: `0 0 9px ${getTypeStyle(item.type).borderColor}`,
                     }}
-                    onClick={() => {
-                    const ip = row.ip_address;
+                  />
 
-                         setSelectedIP(ip);
-                        loadGeoIP(ip);
-                    }}
-                  >
-                    <td style={styles.td}>{row.id}</td>
-                    <td style={styles.td}>
-                      {row.ip_address}
-                    </td>
-                    <td style={styles.td}>
-                      {row.username}
-                    </td>
-                    <td style={styles.td}>
-                      {new Date(
-                        row.attempt_time
-                      ).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  <div style={styles.timelineContent}>
+                    <div style={styles.timelineTop}>
+                      <span style={{ ...styles.typeLabel, ...getTypeStyle(item.type) }}>
+                        {item.type}
+                      </span>
+                      <span style={styles.timeText}>{formatDate(item.timestamp)}</span>
+                    </div>
+
+                    <div style={styles.timelineTitle}>
+                      {item.title}
+                      {item.count > 1 && (
+                        <span style={styles.countBadge}>{item.count} events</span>
+                      )}
+                    </div>
+
+                    <div style={styles.timelineMeta}>
+                      <span>IP: {getPresentationIP(item.sourceIP) || "N/A"}</span>
+                      <span>User: {item.username || "N/A"}</span>
+                      <span>MITRE: {item.mitre}</span>
+                      <span
+                        style={{
+                        ...styles.severityRingLabel,
+                        ...getSeverityStyle(item.severity),
+                        ...(normalise(item.severity) === "critical"
+                          ? styles.criticalSeverityGlow
+                          : {}),
+                      }}
+                      >
+                        <span
+                          style={{
+                            ...styles.severityRing,
+                            borderColor: getSeverityStyle(item.severity).borderColor,
+                          }}
+                        />
+                        {item.severity}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
         <div style={styles.sidePanel}>
-          <h3 style={styles.panelTitle}>
-            IP Investigation
-          </h3>
+          <div style={styles.panelHeader}>
+            <h3 style={styles.panelTitle}>IP Investigation</h3>
+            {selectedIP ? (
+              <button
+                type="button"
+                style={styles.investigateBtn}
+                onClick={() => setActiveInvestigationTab("activity")}
+              >
+                Investigate Selected
+              </button>
+            ) : (
+              ipLoading && <span style={styles.panelMeta}>Loading...</span>
+            )}
+          </div>
 
           {selectedIP ? (
             <>
-              <div style={styles.detailRow}>
-                <span>Selected IP</span>
-                <strong>{selectedIP}</strong>
+              <div style={styles.tabList}>
+                {[
+                  ["summary", "Summary"],
+                  ["risk", "Risk"],
+                  ["geo", "GeoIP"],
+                  ["mitre", "MITRE"],
+                  ["activity", "Activity"],
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    style={{
+                      ...styles.tabButton,
+                      ...(activeInvestigationTab === id ? styles.tabButtonActive : {}),
+                    }}
+                    onClick={() => setActiveInvestigationTab(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
-              <div style={styles.detailRow}>
-                <span>Failed Attempts</span>
-                <strong>
-                  {selectedActivities.length}
-                </strong>
-              </div>
+              {activeInvestigationTab === "summary" && (
+                <div style={styles.sectionBox}>
+                  <strong style={styles.sectionTitle}>Summary</strong>
+                  <div style={styles.detailGrid}>
+                    <div style={styles.detailRow}>
+                      <span>Source IP</span>
+                      <strong>{getPresentationIP(selectedIP)}</strong>
+                    </div>
 
-              <div style={styles.detailRow}>
-                <span>Targeted Users</span>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-  {selectedUsers.map((user) => (
-    <span
-      key={user}
-      style={{
-        background: "#7f1d1d",
-        color: "#fff",
-        padding: "6px 10px",
-        borderRadius: "999px",
-        border: "1px solid #ef4444",
-        fontSize: "14px",
-        fontWeight: "bold",
-      }}
-    >
-      {user}
-    </span>
-  ))}
-</div>
-              </div>
+                    <div style={styles.detailRow}>
+                      <span>Failed Logins</span>
+                      <strong>{selectedDetails.failedLogins?.length || 0}</strong>
+                    </div>
 
-              <div style={styles.detailRow}>
-                <span>First Seen</span>
-                <strong>
-                  {firstSeen
-                    ? new Date(
-                        firstSeen
-                      ).toLocaleString()
-                    : "N/A"}
-                </strong>
-              </div>
+                    <div style={styles.detailRow}>
+                      <span>Related Incidents</span>
+                      <strong>{selectedDetails.incidents?.length || 0}</strong>
+                    </div>
 
-              <div style={styles.detailRow}>
-                <span>Last Seen</span>
-                <strong>
-                  {lastSeen
-                    ? new Date(
-                        lastSeen
-                      ).toLocaleString()
-                    : "N/A"}
-                </strong>
-              </div>
+                    <div style={styles.detailRow}>
+                      <span>Security Events</span>
+                      <strong>{selectedDetails.securityEvents?.length || 0}</strong>
+                    </div>
+                  </div>
 
-              <div style={styles.riskBox}>
-                <strong>Risk Assessment</strong>
+                  <div style={styles.classificationBox}>
+                    <strong style={styles.sectionTitle}>Threat Classification</strong>
+                    <div style={styles.compactRows}>
+                      <span>
+                        Country: {getCountryFlag(geoData?.country)}{" "}
+                        {getDisplayCountry(geoData?.country)}
+                      </span>
+                      <span>
+                        Classification: {threatClassification.classification}
+                      </span>
+                      <span>Confidence: {threatClassification.confidence}</span>
+                    </div>
+                  </div>
 
-                 <p>
-    Risk Level: <strong>{riskLevel}</strong>
-  </p>
+                  {attackChain.length > 0 && (
+                    <div style={styles.attackChainBox}>
+                      <strong style={styles.sectionTitle}>Attack Chain</strong>
+                      <div style={styles.attackChain}>
+                        {attackChain.map((stage, index) => (
+                          <div key={stage} style={styles.attackChainItem}>
+                            <span style={styles.chainDot}>{index + 1}</span>
+                            <span>{stage}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-  <p>
-    This IP has {selectedActivities.length} failed login attempts.
-    Review related incidents and confirm whether this activity matches
-    a brute-force attack pattern.
-  </p>
-              </div>
-    <div style={styles.relatedBox}>
-  <strong>Related Incidents</strong>
+              {activeInvestigationTab === "risk" && (
+                <div
+                  style={{
+                    ...styles.riskBox,
+                    borderColor: getSeverityStyle(selectedDetails.riskLevel).borderColor,
+                  }}
+                >
+                  <div style={styles.riskHeader}>
+                    <span>Risk Score</span>
+                    <strong>{selectedDetails.riskScore}/100</strong>
+                  </div>
+                  <div style={styles.scoreBar}>
+                    <div
+                      style={{
+                        ...styles.scoreFill,
+                        width: `${selectedDetails.riskScore || 0}%`,
+                        background: getSeverityStyle(selectedDetails.riskLevel).borderColor,
+                      }}
+                      className="risk-score-fill"
+                    />
+                  </div>
+                  <strong style={getSeverityStyle(selectedDetails.riskLevel)}>
+                    {selectedDetails.riskLevel} Risk
+                  </strong>
+                  <p style={styles.recommendationText}>
+                    {selectedDetails.recommendation}
+                  </p>
+                  <div style={styles.actionList}>
+                    <strong>Recommended Action</strong>
+                    {(selectedDetails.actions || []).map((action) => (
+                      <span key={action}>- {action}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-  {relatedIncidents.length > 0 ? (
-    relatedIncidents.map((incident) => (
-      <div key={incident.id} style={styles.relatedItem}>
-        <strong>{incident.title}</strong>
-        <span>{incident.severity}</span>
-        <small>{incident.status}</small>
-      </div>
+              {activeInvestigationTab === "geo" && (
+                <div style={styles.sectionBox}>
+                  <strong style={styles.sectionTitle}>GeoIP Intelligence</strong>
+                  {geoData ? (
+                    <div style={styles.compactRows}>
+                      <span>
+                        Country: {getCountryFlag(geoData.country)}{" "}
+                        {getDisplayCountry(geoData.country)}
+                      </span>
+                      <span>City: {geoData.city}</span>
+                      <span>ISP: {geoData.isp}</span>
+                      <span>Org: {geoData.org}</span>
+                    </div>
+                  ) : (
+                    <p style={styles.emptyText}>GeoIP data unavailable.</p>
+                  )}
+                </div>
+              )}
 
+              {activeInvestigationTab === "mitre" && (
+                <div style={styles.sectionBox}>
+                  <strong style={styles.sectionTitle}>MITRE Technique Mapping</strong>
+                  {relatedMitre.length > 0 ? (
+                    relatedMitre.map((item) => (
+                      <div key={item.technique} style={styles.mitreItem}>
+                        <span style={styles.mitreTactic}>{item.tactic}</span>
+                        <strong>{item.technique}</strong>
+                        <span>{item.name}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p style={styles.emptyText}>No MITRE techniques mapped.</p>
+                  )}
+                </div>
+              )}
 
-    ))
-  ) : (
-    <p>No related incidents found for this IP.</p>
-  )}
-</div>
+              {activeInvestigationTab === "activity" && (
+                <div style={styles.sectionBox}>
+                  <strong style={styles.sectionTitle}>Related Activity</strong>
+                  {(selectedDetails.incidents || []).slice(0, 5).map((incident) => (
+                    <div key={`incident-${incident.id}`} style={styles.relatedItem}>
+                      <span style={styles.relatedTitle}>{incident.title}</span>
+                      <div style={styles.badgeRow}>
+                        <span
+                          style={{
+                            ...styles.activityBadge,
+                            borderColor: getTypeStyle("Incident").borderColor,
+                            color: getTypeStyle("Incident").color,
+                          }}
+                        >
+                          INCIDENT
+                        </span>
+                        <span
+                          style={{
+                            ...styles.activityBadge,
+                            borderColor: getSeverityStyle(incident.severity).borderColor,
+                            color: getSeverityStyle(incident.severity).color,
+                          }}
+                        >
+                          {incident.severity || "LOW"}
+                        </span>
+                        <span style={styles.statusBadge}>
+                          {incident.status || "open"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
 
-      <div style={styles.attackTypesBox}>
-  <strong>Correlation Alerts</strong>
+                  {(selectedDetails.securityEvents || []).slice(0, 5).map((event) => (
+                    <div key={`event-${event.id}`} style={styles.relatedItem}>
+                      <span style={styles.relatedTitle}>
+                        {event.event_type || event.category}
+                      </span>
+                      <div style={styles.badgeRow}>
+                        <span
+                          style={{
+                            ...styles.activityBadge,
+                            borderColor: getTypeStyle("Security Event").borderColor,
+                            color: getTypeStyle("Security Event").color,
+                          }}
+                        >
+                          SECURITY EVENT
+                        </span>
+                        <span
+                          style={{
+                            ...styles.activityBadge,
+                            borderColor: getSeverityStyle(event.severity).borderColor,
+                            color: getSeverityStyle(event.severity).color,
+                          }}
+                        >
+                          {event.severity || "LOW"}
+                        </span>
+                        <span style={styles.statusBadge}>
+                          {formatDate(event.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
 
-  {correlationAlerts.length > 0 ? (
-    <>
-      {correlationAlerts.map((alert) => (
-        <div key={alert.id} style={styles.relatedItem}>
-          <strong>{alert.title}</strong>
-          <span>{alert.severity}</span>
-          <small>{alert.status}</small>
-        </div>
-      ))}
-
-      <p style={{ marginTop: "12px" }}>
-        Total Correlation Alerts:{" "}
-        <strong>{correlationAlerts.length}</strong>
-      </p>
-    </>
-  ) : (
-    <p>No correlation alerts found.</p>
-  )}
-</div>
-
-<div style={styles.attackTypesBox}>
-  <strong>Attack Timeline</strong>
-
-  {attackTimeline.length > 0 ? (
-    attackTimeline.map((event) => (
-      <div key={event.id} style={styles.timelineItem}>
-        <strong>{event.title}</strong>
-
-        <small>
-          {new Date(event.created_at).toLocaleString()}
-        </small>
-
-        <span>{event.severity}</span>
-      </div>
-    ))
-  ) : (
-    <p>No timeline events available.</p>
-  )}
-</div>
-     <div style={styles.attackTypesBox}>
-  <strong>Attack Statistics</strong>
-
-  <p>Failed Logins: {selectedActivities.length}</p>
-
-  <p>Related Incidents: {relatedIncidents.length}</p>
-
-  <p>Attack Types: {attackTypes.length}</p>
-
-  <p>Critical Alerts: {criticalCount}</p>
-
-  <p>High Alerts: {highCount}</p>
-</div>
-      <div style={styles.attackTypesBox}>
-  <strong>Threat Intelligence</strong>
-
-  <p>IP Address: {selectedIP}</p>
-
-  <p>Type: {ipIntel.type}</p>
-
-  <p>Classification: {ipIntel.classification}</p>
-
-  <p>Risk: {ipIntel.risk}</p>
-
-  <p>Location: {ipIntel.location}</p>
-
-  {geoData && (
-    <>
-      <hr />
-
-      <p>
-        Country: <strong>{geoData.country}</strong>
-      </p>
-
-      <p>
-        City: <strong>{geoData.city}</strong>
-      </p>
-
-      <p>
-        ISP: <strong>{geoData.isp}</strong>
-      </p>
-
-      <p>
-        Organization: <strong>{geoData.org}</strong>
-      </p>
-    </>
-  )}
-</div>
-
-        <div style={styles.attackTypesBox}>
-  <strong>Threat Reputation Score</strong>
-
-  <p>
-    Score: <strong>{reputationScore}/100</strong>
-  </p>
-
-  <p>
-    Classification: <strong>{reputationLevel}</strong>
-  </p>
-
-  <p>
-    Recommendation:{" "}
-    <strong>
-      {reputationLevel === "Critical"
-        ? "Investigate Immediately"
-        : reputationLevel === "High"
-        ? "Prioritise Review"
-        : reputationLevel === "Medium"
-        ? "Monitor Activity"
-        : "Low Priority"}
-    </strong>
-  </p>
-</div>
-
-<div style={styles.attackTypesBox}>
-  <strong>Threat Recommendations</strong>
-
-  {recommendations.length > 0 ? (
-    recommendations.map((item, index) => (
-      <div key={index} style={styles.recommendationItem}>
-        {item}
-      </div>
-    ))
-  ) : (
-    <p>No recommendations available.</p>
-  )}
-</div>
-
-       <div style={styles.attackTypesBox}>
-  <strong>MITRE ATT&CK Mapping</strong>
-
-  {mitreMappings.map((item, index) => (
-  <div key={`${item.technique}-${index}`} style={styles.mitreItem}>
-      <strong>{item.technique}</strong>
-      <span>{item.name}</span>
-    </div>
-  ))}
-</div>
+                  {(selectedDetails.incidents || []).length === 0 &&
+                    (selectedDetails.securityEvents || []).length === 0 && (
+                      <p style={styles.emptyText}>No related activity.</p>
+                    )}
+                </div>
+              )}
             </>
           ) : (
             <p style={styles.emptyText}>
-              Click an IP address from the table to
-              investigate it.
+              Select any timeline row with a source IP to open the investigation
+              panel.
             </p>
           )}
         </div>
@@ -695,192 +1031,470 @@ const styles = {
     background: "#0f172a",
     color: "#f8fafc",
     minHeight: "100vh",
-    padding: "16px",
-  },
-
-  title: {
-    margin: 0,
-    fontSize: "24px",
+    padding: "10px",
   },
 
   subtitle: {
     color: "#94a3b8",
-    marginBottom: "25px",
+    margin: "0 0 12px",
+    fontSize: "13px",
   },
 
   statsGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "15px",
-    marginBottom: "25px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+    gap: "10px",
+    marginBottom: "12px",
   },
 
   statCard: {
     background: "#111827",
-    border: "1px solid #1e293b",
-    borderRadius: "14px",
-    padding: "12px",
+    border: "1px solid #263244",
+    borderRadius: "8px",
+    padding: "10px 12px",
+    minHeight: "62px",
     display: "flex",
     flexDirection: "column",
-    gap: "10px",
+    justifyContent: "center",
+  },
+
+  criticalFindingCard: {
+    borderLeft: "4px solid #ef4444",
+    boxShadow: "0 0 10px rgba(239,68,68,.14)",
+  },
+
+  statLabel: {
+    color: "#94a3b8",
+    fontSize: "12px",
+    fontWeight: "600",
+  },
+
+  statValue: {
+    marginTop: "4px",
+    fontSize: "23px",
+    lineHeight: 1,
   },
 
   filters: {
-    display: "flex",
-    gap: "10px",
-    marginBottom: "20px",
-    flexWrap: "wrap",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+    gap: "8px",
+    marginBottom: "12px",
   },
 
   input: {
     background: "#020617",
-    color: "#fff",
+    color: "#e5e7eb",
     border: "1px solid #334155",
-    borderRadius: "8px",
-    padding: "10px",
-    minWidth: "220px",
+    borderRadius: "6px",
+    padding: "8px 10px",
+    fontSize: "12px",
+    minWidth: 0,
   },
 
   clearBtn: {
-    background: "#4f46e5",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    padding: "10px 16px",
+    background: "#1e293b",
+    color: "#f8fafc",
+    border: "1px solid #334155",
+    borderRadius: "6px",
+    padding: "8px 10px",
     cursor: "pointer",
+    fontSize: "12px",
+    fontWeight: "700",
   },
 
   mainGrid: {
     display: "grid",
-    gridTemplateColumns: "2fr 1fr",
-    gap: "20px",
+    gridTemplateColumns: "minmax(0, 1.65fr) minmax(340px, 0.9fr)",
+    gap: "12px",
+    alignItems: "start",
   },
 
-  tableBox: {
+  timelinePanel: {
     background: "#111827",
-    border: "1px solid #1e293b",
-    borderRadius: "14px",
-    padding: "12px",
-    overflowX: "auto",
+    border: "1px solid #263244",
+    borderRadius: "8px",
+    padding: "10px",
+    minWidth: 0,
   },
 
   sidePanel: {
     background: "#111827",
-    border: "1px solid #1e293b",
-    borderRadius: "14px",
-    padding: "12px",
+    border: "1px solid #263244",
+    borderRadius: "8px",
+    padding: "10px",
+    minWidth: 0,
+  },
+
+  panelHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "8px",
   },
 
   panelTitle: {
-    marginTop: 0,
-    marginBottom: "15px",
+    margin: 0,
+    fontSize: "15px",
+    fontWeight: "700",
   },
 
-  table: {
+  panelMeta: {
+    color: "#94a3b8",
+    fontSize: "11px",
+  },
+
+  tabList: {
+    display: "grid",
+    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+    gap: "6px",
+    marginBottom: "10px",
+  },
+
+  tabButton: {
+    background: "#020617",
+    color: "#94a3b8",
+    border: "1px solid #263244",
+    borderRadius: "6px",
+    padding: "7px 6px",
+    cursor: "pointer",
+    fontSize: "11px",
+    fontWeight: "700",
+  },
+
+  tabButtonActive: {
+    color: "#f8fafc",
+    borderColor: "#3b82f6",
+    background: "#0f1a33",
+    boxShadow: "0 0 8px rgba(59,130,246,.5)",
+  },
+
+  investigateBtn: {
+    background: "#1e293b",
+    color: "#bfdbfe",
+    border: "1px solid #3b82f6",
+    borderRadius: "6px",
+    padding: "6px 9px",
+    cursor: "pointer",
+    fontSize: "11px",
+    fontWeight: "700",
+  },
+
+  timelineList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+
+  timelineItem: {
     width: "100%",
-    borderCollapse: "collapse",
-  },
-
-  th: {
+    display: "grid",
+    gridTemplateColumns: "16px 1fr",
+    gap: "8px",
     textAlign: "left",
-    padding: "8px",
-    borderBottom: "1px solid #334155",
-  },
-
-  td: {
-    padding: "8px",
-    borderBottom: "1px solid #1e293b",
-  },
-
-  tr: {
+    color: "#f8fafc",
+    border: "1px solid #263244",
+    borderRadius: "8px",
+    padding: "9px",
     cursor: "pointer",
   },
 
+  timelineDot: {
+    width: "13px",
+    height: "13px",
+    borderRadius: "50%",
+    border: "3px solid",
+    marginTop: "3px",
+  },
+
+  timelineContent: {
+    minWidth: 0,
+  },
+
+  timelineTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "4px",
+  },
+
+  typeLabel: {
+    color: "#38bdf8",
+    fontSize: "11px",
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+
+  timeText: {
+    color: "#94a3b8",
+    fontSize: "11px",
+    whiteSpace: "nowrap",
+  },
+
+  timelineTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+    fontSize: "13px",
+    fontWeight: "700",
+    overflowWrap: "anywhere",
+  },
+
+  countBadge: {
+    color: "#bfdbfe",
+    background: "#1e293b",
+    border: "1px solid #334155",
+    borderRadius: "999px",
+    padding: "2px 7px",
+    fontSize: "10px",
+    fontWeight: "700",
+  },
+
+  timelineMeta: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    marginTop: "6px",
+    color: "#cbd5e1",
+    fontSize: "11px",
+  },
+
+  severityRingLabel: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    border: "1px solid currentColor",
+    borderRadius: "999px",
+    padding: "2px 7px",
+    textTransform: "capitalize",
+    fontWeight: "700",
+  },
+
+  criticalSeverityGlow: {
+    boxShadow: "0 0 8px rgba(239,68,68,.3)",
+    background: "rgba(239,68,68,.08)",
+  },
+
+  severityRing: {
+    width: "9px",
+    height: "9px",
+    borderRadius: "50%",
+    border: "2px solid",
+  },
+
+  detailGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+  },
+
   detailRow: {
-    borderBottom: "1px solid #334155",
-    padding: "8px 0",
+    background: "#020617",
+    border: "1px solid #263244",
+    borderRadius: "8px",
+    padding: "8px",
     display: "flex",
     flexDirection: "column",
-    gap: "5px",
+    gap: "4px",
+    minWidth: 0,
   },
 
   riskBox: {
-    marginTop: "18px",
-    background: "#7f1d1d",
-    border: "1px solid #ef4444",
-    borderRadius: "10px",
+    marginTop: "10px",
+    background: "#020617",
+    border: "1px solid #263244",
+    borderRadius: "8px",
     padding: "10px",
+  },
+
+  riskHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: "8px",
+    fontSize: "12px",
+  },
+
+  scoreBar: {
+    height: "8px",
+    background: "#1e293b",
+    borderRadius: "999px",
+    overflow: "hidden",
+    marginBottom: "8px",
+  },
+
+  scoreFill: {
+    height: "100%",
+    borderRadius: "999px",
+    transition: "width 700ms ease",
+  },
+
+  recommendationText: {
+    color: "#cbd5e1",
+    fontSize: "12px",
+    lineHeight: 1.4,
+    margin: "8px 0 0",
+  },
+
+  actionList: {
+    display: "grid",
+    gap: "5px",
+    marginTop: "10px",
+    color: "#cbd5e1",
+    fontSize: "11px",
+    lineHeight: 1.35,
+  },
+
+  sectionBox: {
+    marginTop: "10px",
+    background: "#020617",
+    border: "1px solid #263244",
+    borderRadius: "8px",
+    padding: "10px",
+  },
+
+  sectionTitle: {
+    display: "block",
+    marginBottom: "8px",
+    fontSize: "12px",
+  },
+
+  compactRows: {
+    display: "grid",
+    gap: "4px",
+    color: "#cbd5e1",
+    fontSize: "11px",
+  },
+
+  classificationBox: {
+    marginTop: "10px",
+    paddingTop: "10px",
+    borderTop: "1px solid #1e293b",
+  },
+
+  attackChainBox: {
+    marginTop: "10px",
+    paddingTop: "10px",
+    borderTop: "1px solid #1e293b",
+  },
+
+  attackChain: {
+    display: "grid",
+    gap: "7px",
+  },
+
+  attackChainItem: {
+    display: "grid",
+    gridTemplateColumns: "22px 1fr",
+    alignItems: "center",
+    gap: "8px",
+    color: "#cbd5e1",
+    fontSize: "11px",
+  },
+
+  chainDot: {
+    width: "20px",
+    height: "20px",
+    borderRadius: "50%",
+    border: "1px solid #3b82f6",
+    color: "#bfdbfe",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "10px",
+    fontWeight: "700",
+  },
+
+  relatedItem: {
+    borderTop: "1px solid #1e293b",
+    padding: "7px 0",
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+  },
+
+  relatedTitle: {
+    fontSize: "12px",
+    fontWeight: "700",
+    overflowWrap: "anywhere",
+  },
+
+  relatedMeta: {
+    color: "#94a3b8",
+    fontSize: "11px",
+    textTransform: "capitalize",
+  },
+
+  badgeRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "5px",
+    marginTop: "3px",
+  },
+
+  activityBadge: {
+    border: "1px solid",
+    borderRadius: "999px",
+    padding: "2px 6px",
+    fontSize: "10px",
+    fontWeight: "700",
+    lineHeight: 1.2,
+    textTransform: "uppercase",
+  },
+
+  statusBadge: {
+    border: "1px solid #334155",
+    borderRadius: "999px",
+    color: "#bfdbfe",
+    background: "#1e293b",
+    padding: "2px 6px",
+    fontSize: "10px",
+    fontWeight: "700",
+    lineHeight: 1.2,
+    textTransform: "uppercase",
+  },
+
+  criticalToast: {
+    position: "fixed",
+    right: "18px",
+    bottom: "18px",
+    zIndex: 20,
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+    maxWidth: "320px",
+    background: "#111827",
+    border: "1px solid #ef4444",
+    borderLeft: "4px solid #ef4444",
+    borderRadius: "8px",
+    color: "#f8fafc",
+    padding: "10px 12px",
+    boxShadow: "0 8px 24px rgba(0,0,0,.35)",
+    fontSize: "12px",
+  },
+
+  mitreItem: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+    borderTop: "1px solid #1e293b",
+    padding: "7px 0",
+    color: "#cbd5e1",
+    fontSize: "11px",
+  },
+
+  mitreTactic: {
+    color: "#38bdf8",
+    fontSize: "10px",
+    fontWeight: "700",
+    textTransform: "uppercase",
   },
 
   emptyText: {
     color: "#94a3b8",
+    fontSize: "12px",
+    margin: 0,
   },
-
-  loading: {
-    color: "#94a3b8",
-  },
-  relatedBox: {
-  marginTop: "18px",
-  background: "#020617",
-  border: "1px solid #334155",
-  borderRadius: "10px",
-  padding: "10px",
-},
-
-relatedItem: {
-  marginTop: "10px",
-  padding: "10px",
-  borderRadius: "8px",
-  background: "#111827",
-  border: "1px solid #1e293b",
-  display: "flex",
-  flexDirection: "column",
-  gap: "4px",
-},
-attackTypesBox: {
-  marginTop: "18px",
-  background: "#020617",
-  border: "1px solid #334155",
-  borderRadius: "10px",
-  padding: "14px",
-},
-
-attackTypeItem: {
-  marginTop: "10px",
-  background: "#1e293b",
-  color: "#f8fafc",
-  padding: "8px 10px",
-  borderRadius: "8px",
-  border: "1px solid #475569",
-  fontWeight: "bold",
-},
-timelineItem: {
-  marginTop: "10px",
-  padding: "10px",
-  borderRadius: "8px",
-  background: "#111827",
-  border: "1px solid #1e293b",
-  display: "flex",
-  flexDirection: "column",
-  gap: "4px",
-},
-mitreItem: {
-  marginTop: "10px",
-  background: "#1e293b",
-  color: "#f8fafc",
-  padding: "10px",
-  borderRadius: "8px",
-  border: "1px solid #475569",
-  display: "flex",
-  flexDirection: "column",
-  gap: "4px",
-},
-recommendationItem: {
-  marginTop: "10px",
-  padding: "10px",
-  borderRadius: "8px",
-  background: "#111827",
-  border: "1px solid #334155",
-},
 };
+

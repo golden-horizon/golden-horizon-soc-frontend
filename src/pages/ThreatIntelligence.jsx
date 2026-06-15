@@ -7,13 +7,13 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import {
+  getPresentationIP,
+  isGeoIPVisualizationIP,
+} from "../utils/geoPresentation";
 
 export default function ThreatIntelligence() {
   const [incidents, setIncidents] = useState([]);
-
-  useEffect(() => {
-    loadIncidents();
-  }, []);
 
   const loadIncidents = async () => {
     try {
@@ -38,6 +38,11 @@ export default function ThreatIntelligence() {
     }
   };
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadIncidents();
+  }, []);
+
   const normalise = (value) =>
     (value || "").toString().toLowerCase();
 
@@ -60,7 +65,9 @@ export default function ThreatIntelligence() {
   ).length;
 
   const ipCounts = incidents.reduce((acc, incident) => {
-    const ip = incident.source_ip || "Unknown";
+    if (!isGeoIPVisualizationIP(incident.source_ip)) return acc;
+
+    const ip = getPresentationIP(incident.source_ip);
     acc[ip] = (acc[ip] || 0) + 1;
     return acc;
   }, {});

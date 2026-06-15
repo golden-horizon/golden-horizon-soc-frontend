@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import {
+  getGeoIPLookupIP,
+  getPresentationIP,
+  isExternalCountry,
+  isGeoIPVisualizationIP,
+} from "../utils/geoPresentation";
 
 export default function ThreatHunting() {
   const [incidents, setIncidents] = useState([]);
@@ -88,7 +94,14 @@ export default function ThreatHunting() {
 
   useEffect(() => {
     const loadCountryData = async () => {
-      const sourceIPs = [...new Set(huntResults.map((i) => i.source_ip).filter(Boolean))];
+      const sourceIPs = [
+        ...new Set(
+          huntResults
+            .map((i) => i.source_ip)
+            .filter(isGeoIPVisualizationIP)
+            .map(getGeoIPLookupIP)
+        ),
+      ];
 
       if (sourceIPs.length === 0) {
         setCountryByIP({});
@@ -108,7 +121,7 @@ export default function ThreatHunting() {
 
         const nextCountryByIP = geoResults.reduce((acc, geo) => {
           const ip = geo.ip || geo.query;
-          if (ip) acc[ip] = geo.country || "Unknown";
+          if (ip) acc[getPresentationIP(ip)] = geo.country || "Unknown";
           return acc;
         }, {});
 
@@ -126,19 +139,20 @@ export default function ThreatHunting() {
   );
 
   const uniqueAttackSources = new Set(
-    huntResults.map((incident) => incident.source_ip).filter(Boolean)
+    huntResults
+      .map((incident) => incident.source_ip)
+      .filter(isGeoIPVisualizationIP)
+      .map(getPresentationIP)
   ).size;
 
   const countryCount = new Set(
     huntResults
-      .map((incident) => countryByIP[incident.source_ip])
-      .filter((country) => country && country !== "Unknown")
+      .map((incident) => countryByIP[getPresentationIP(incident.source_ip)])
+      .filter(isExternalCountry)
   ).size;
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.title}>Threat Hunting</h1>
-
       <p style={styles.subtitle}>
         Search incidents by IP, attack type, severity, status, or description.
       </p>
@@ -253,7 +267,8 @@ export default function ThreatHunting() {
               <h3>{incident.title}</h3>
               <p>{incident.description}</p>
               <p>
-                <strong>Source IP:</strong> {incident.source_ip || "N/A"}
+                <strong>Source IP:</strong>{" "}
+                {getPresentationIP(incident.source_ip) || "N/A"}
               </p>
               <p>
                 <strong>Severity:</strong> {incident.severity}
