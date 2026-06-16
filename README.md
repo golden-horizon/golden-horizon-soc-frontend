@@ -100,7 +100,7 @@ MFA Code: 123456
 
 As someone transitioning into cybersecurity, I wanted to build more than just a dashboard. My goal was to create a project that demonstrates practical SOC concepts including monitoring, detection, investigation, reporting, authentication, and cloud deployment.
 
-Building this project gave me hands-on experience with full-stack development, PostgreSQL, API security, real-time communication, cloud infrastructure, and security operations workflows.
+It gave me hands on experience with full-stack development, PostgreSQL, API security, real-time communication, cloud infrastructure, and security operations workflows.
 
 ## Author
 
