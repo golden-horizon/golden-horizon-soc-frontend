@@ -16,6 +16,7 @@ import ThreatHunting from "./pages/ThreatHunting";
 import ThreatIntelligence from "./pages/ThreatIntelligence";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import Reports from "./pages/Reports";
+import AICaseDetails from "./pages/AICaseDetails";
 
 function App() {
   return (
@@ -68,6 +69,7 @@ function App() {
           <Route path="/threat-intelligence" element={<ThreatIntelligence />} />
           <Route path="/executive-dashboard" element={<ExecutiveDashboard />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/ai-cases/:caseId" element={<AICaseDetails />} />
         </Route>
 
         {/* DEFAULT */}

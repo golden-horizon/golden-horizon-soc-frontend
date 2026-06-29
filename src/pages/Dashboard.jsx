@@ -26,6 +26,9 @@ export default function Dashboard() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [socStats, setSocStats] = useState(null);
+  const [highPriorityCases, setHighPriorityCases] = useState([]);
+  const [aiCases, setAiCases] = useState([]);
 
   const playAlertSound = () => {
     const audio = new Audio("/alert.mp3");
@@ -35,7 +38,59 @@ export default function Dashboard() {
       console.log("Sound blocked until user interaction:", err);
     });
   };
-//loadIncidents
+// load AI SOC stats
+  useEffect(() => {
+    const loadSocStats = async () => {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/statistics");
+        const data = await res.json();
+        console.log("AI SOC STATS:", data);
+        setSocStats(data);
+      } catch (err) {
+        console.log("Failed to load AI SOC stats:", err);
+      }
+    };
+
+    loadSocStats();
+  }, []);
+
+
+  useEffect(() => {
+  const loadAiCases = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/cases");
+      const data = await res.json();
+
+      console.log("AI SOC CASES:", data);
+
+      setAiCases(data.cases || []);
+    } catch (err) {
+      console.log("Failed to load AI SOC cases:", err);
+    }
+  };
+
+  loadAiCases();
+  }, []);
+
+
+  useEffect(() => {
+  const loadHighPriority = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/high-priority");
+      const data = await res.json();
+
+      console.log("HIGH PRIORITY CASES:", data);
+
+      setHighPriorityCases(data.cases || []);
+    } catch (err) {
+      console.log("Failed to load high priority cases:", err);
+    }
+  };
+
+  loadHighPriority();
+  }, []);
+
+// load incidents
   useEffect(() => {
     const loadIncidents = async () => {
   try {
@@ -198,7 +253,8 @@ const topAttackTypes = Object.entries(attackTypeCounts)
   .map(([name, count]) => ({ name, count }))
   .sort((a, b) => b.count - a.count)
   .slice(0, 5);
-  const filteredIncidents = incidents.filter((i) => {
+  const displayCases = aiCases.length > 0 ? aiCases : incidents;
+  const filteredIncidents = displayCases.filter((i) => {
   const matchesFilter =
     filter === "all" ||
     normalise(i.severity) === filter ||
@@ -240,17 +296,17 @@ const topAttackTypes = Object.entries(attackTypeCounts)
     <div style={styles.statsGrid}>
       <div className="soc-kpi-card" style={styles.statCard}>
         <span style={styles.statLabel}>Total Incidents</span>
-        <strong style={styles.statValue}>{stats.total}</strong>
+        <strong style={styles.statValue}>{socStats?.total_cases ?? stats.total}</strong>
       </div>
 
       <div className="soc-kpi-card" style={styles.statCard}>
         <span style={styles.statLabel}>Open</span>
-        <strong style={styles.statValue}>{stats.open}</strong>
+        <strong style={styles.statValue}>{socStats?.by_status?.Open ?? stats.open}</strong>
       </div>
 
       <div className="soc-kpi-card" style={styles.statCard}>
         <span style={styles.statLabel}>In Progress</span>
-        <strong style={styles.statValue}>{stats.inProgress}</strong>
+        <strong style={styles.statValue}>{socStats?.by_status?.["In Progress"] ?? stats.inProgress}</strong>
       </div>
 
       <div className="soc-kpi-card" style={styles.statCard}>
@@ -260,12 +316,12 @@ const topAttackTypes = Object.entries(attackTypeCounts)
 
       <div className="soc-kpi-card" style={{ ...styles.statCard, borderLeft: "3px solid #ef4444" }}>
         <span style={styles.statLabel}>Critical</span>
-        <strong style={styles.statValue}>{stats.critical}</strong>
+        <strong style={styles.statValue}>{socStats?.by_severity?.Critical ?? stats.critical}</strong>
       </div>
 
       <div className="soc-kpi-card" style={{ ...styles.statCard, borderLeft: "3px solid #f97316" }}>
         <span style={styles.statLabel}>High</span>
-        <strong style={styles.statValue}>{stats.high}</strong>
+        <strong style={styles.statValue}>{socStats?.by_severity?.High ?? stats.high}</strong>
       </div>
 
 
@@ -345,28 +401,23 @@ const topAttackTypes = Object.entries(attackTypeCounts)
 <div style={styles.chartGrid}>
 
   <div style={styles.chartBox}>
-    <h3 style={styles.panelTitle}>Recent Critical Alerts</h3>
+    <h3 style={styles.panelTitle}>Escalated AI SOC Cases</h3>
 
-    {incidents
-      .filter(
-        (i) => (i.severity || "").toLowerCase() === "critical"
-      )
-      .slice(0, 5)
-      .map((i) => (
-        <div
-          key={i.id || i.incident_id}
-          style={{
-            padding: "8px",
-            borderBottom: "1px solid #334155",
-          }}
-        >
-          <strong>{i.title}</strong>
-          <br />
-          <small>
-            {formatDate(i.created_at || i.createdAt)}
-          </small>
-        </div>
-      ))}
+    {highPriorityCases.slice(0, 5).map((c) => (
+  <div
+    key={c.case_id}
+    style={{
+      padding: "8px",
+      borderBottom: "1px solid #334155",
+    }}
+  >
+    <strong>{c.incident?.attack_type || "Unknown Attack"}</strong>
+    <br />
+    <small>
+      {c.severity} · {c.incident?.source_ip} · Events: {c.event_count}
+    </small>
+  </div>
+))}
   </div>
 
   <div style={styles.chartBox}>
@@ -422,7 +473,11 @@ const topAttackTypes = Object.entries(attackTypeCounts)
 
     <div style={styles.grid}>
       {filteredIncidents.map((i) => {
-        const id = i.id || i.incident_id;
+        const id = i.case_id || i.id || i.incident_id;
+        const attackType = i.incident?.attack_type || i.title |"Unknown Attack";
+        const sourceIp = i.incident?.source_ip || i.source_ip || "Unknown IP";
+        const user = i.incident?.user || i.user || "unknown";
+        const eventCount = i.event_count || 1;
 
         return (
           <div
@@ -439,11 +494,17 @@ const topAttackTypes = Object.entries(attackTypeCounts)
       ? "6px solid #f97316"
       : "6px solid #2563eb",
 }}
-  onClick={() => navigate(`/incidents/${id}`)}
+  onClick={() => navigate(`/ai-cases/${id}`)}
 >
-            <div style={styles.incidentTitle}>{i.title}</div>
+            <div style={styles.incidentTitle}>
+            {attackType}
+            <br />
+            <small style={{ color: "#94a3b8" }}>{id}</small>
+            </div>
 
-            <div style={styles.incidentDesc}>{i.description}</div>
+            <div style={styles.incidentDesc}>
+                  Source IP: {sourceIp} · User: {user} · Events: {eventCount}
+            </div>
 
             <span style={{ ...styles.severityIndicator, ...getSeverityStyle(i.severity) }}>
               <span style={{ ...styles.severityRing, ...getSeverityStyle(i.severity) }} />
