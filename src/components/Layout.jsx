@@ -114,19 +114,21 @@ export default function Layout() {
   const isActive = (path) => location.pathname.startsWith(path);
 
   const getTitle = () => {
-  if (location.pathname.includes("create-incident")) return "Create Incident";
-  if (location.pathname.includes("investigation")) return "Investigation";
-  if (location.pathname.includes("security-events")) return "Security Events";
-  if (location.pathname.includes("world-map")) return "World Map";
-  if (location.pathname.includes("executive-dashboard")) return "Executive Dashboard";
-  if (location.pathname.includes("dashboard")) return "Dashboard";
-  if (location.pathname.includes("incidents/")) return "Incident Response";
-  if (location.pathname.includes("threat-hunting")) return "Threat Hunting";
-  if (location.pathname.includes("threat-intelligence")) return "Threat Intelligence";
-  if (location.pathname.includes("reports")) return "Reports";
-  
-  return "SOC Platform";
-};
+    if (location.pathname === "/dashboard") return null;
+    if (location.pathname.includes("create-incident")) return "Create Incident";
+    if (location.pathname.includes("investigation")) return "Investigation";
+    if (location.pathname.includes("security-events")) return "Security Events";
+    if (location.pathname.includes("world-map")) return "World Map";
+    if (location.pathname.includes("executive-dashboard")) return "Executive Dashboard";
+    if (location.pathname.includes("incidents/")) return "Incident Response";
+    if (location.pathname.includes("threat-hunting")) return "Threat Hunting";
+    if (location.pathname.includes("threat-intelligence")) return "Threat Intelligence";
+    if (location.pathname.includes("reports")) return "Reports";
+
+    return "SOC Platform";
+  };
+
+  const pageTitle = getTitle();
 
   const formatCvePublished = (published) => {
     if (!published) return "Published date unavailable";
@@ -155,8 +157,7 @@ export default function Layout() {
             style={styles.brandIcon}
           />
           <div style={styles.brandCopy}>
-            <span style={styles.brandProduct}>SOC Platform</span>
-            <span style={styles.brandCompany}>by Golden Horizon</span>
+            <span style={styles.brandProduct}>Agentic AI</span>
           </div>
         </div>
        <div style={styles.userPanel}>
@@ -359,18 +360,11 @@ export default function Layout() {
       </div>
 
       <div style={styles.main}>
-        <div style={styles.topbar}>
-       <h2
-  style={{
-    margin: 0,
-    fontSize: "28px",
-    fontWeight: "700",
-    color: "#f8fafc",
-  }}
->
-  {getTitle()}
-</h2>
-        </div>
+        {pageTitle && (
+          <div style={styles.topbar}>
+            <h2 style={styles.topbarTitle}>{pageTitle}</h2>
+          </div>
+        )}
 
         <div style={styles.content}>
           <Outlet />
@@ -382,42 +376,43 @@ export default function Layout() {
 
 const navStyle = (active) => ({
   ...styles.link,
-  background: active ? "#4f46e5" : "transparent",
-  color: active ? "#fff" : "#cbd5e1",
+  background: active ? "rgba(96, 165, 250, 0.18)" : "transparent",
+  color: active ? "#f8fafc" : "#cbd5e1",
+  borderLeft: active ? "3px solid #60a5fa" : "3px solid transparent",
 });
 
 const styles = {
   shell: {
     display: "flex",
     minHeight: "100vh",
-    background: "#0f172a",
+    background: "#08111f",
     width: "100%",
   },
 
  sidebar: {
   width: "240px",
-  background: "#0b1220",
+  background: "#08111f",
   color: "#fff",
-  padding: "14px 10px",
+  padding: "16px 12px",
   display: "flex",
   flexDirection: "column",
-  gap: "6px",
-  borderRight: "1px solid #1e293b",
+  gap: "7px",
+  borderRight: "1px solid #334155",
   overflowY: "auto",
 },
 
   brand: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
-    gap: "10px",
+    justifyContent: "flex-start",
+    gap: "8px",
     marginBottom: "16px",
     padding: "2px 0 4px",
   },
 
   brandIcon: {
-    width: "58px",
-    height: "38px",
+    width: "52px",
+    height: "34px",
     objectFit: "contain",
     borderRadius: "6px",
     flexShrink: 0,
@@ -430,29 +425,21 @@ const styles = {
     minWidth: 0,
   },
 
-  brandCompany: {
-    color: "#d9b85f",
-    fontSize: "12px",
-    fontWeight: "700",
-    letterSpacing: "0.3px",
-    whiteSpace: "nowrap",
-  },
-
   brandProduct: {
     color: "#f8fafc",
-    fontSize: "18px",
+    fontSize: "17px",
     fontWeight: "800",
-    letterSpacing: "0",
+    letterSpacing: "0.2px",
     whiteSpace: "nowrap",
   },
 
  link: {
-  padding: "7px 10px",
+  padding: "8px 10px",
   border: "none",
-  borderRadius: "8px",
+  borderRadius: "6px",
   cursor: "pointer",
   textAlign: "left",
-  fontWeight: "500",
+  fontWeight: "600",
   fontSize: "13px",
 },
   logout: {
@@ -474,12 +461,18 @@ const styles = {
   },
 
  topbar: {
-  padding: "12px 18px",
-  borderBottom: "1px solid #1e293b",
-  background: "#0b1220",
+  padding: "14px 22px",
+  borderBottom: "1px solid #334155",
+  background: "#08111f",
+},
+topbarTitle: {
+  margin: 0,
+  fontSize: "24px",
+  fontWeight: "700",
+  color: "#f8fafc",
 },
   content: {
-    padding: "10px",
+    padding: "0",
     width: "100%",
     boxSizing: "border-box",
   },
@@ -602,15 +595,15 @@ criticalDot: {
   flexShrink: 0,
 },
 userPanel: {
-  background: "#111827",
-  border: "1px solid #1e293b",
-  borderRadius: "10px",
+  background: "#0f172a",
+  border: "1px solid #334155",
+  borderRadius: "8px",
   padding: "10px",
   marginBottom: "14px",
 },
 
 userRole: {
-  color: "#38bdf8",
+  color: "#60a5fa",
   fontSize: "13px",
   fontWeight: "700",
   marginBottom: "6px",
@@ -622,7 +615,7 @@ userEmail: {
 },
 userStatus: {
   marginTop: "8px",
-  color: "#16a34a",
+  color: "#10b981",
   fontSize: "11px",
   fontWeight: "500",
   textAlign: "center",
@@ -637,4 +630,3 @@ userStats: {
   fontSize: "11px",
 },
 };
-

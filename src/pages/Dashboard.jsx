@@ -42,7 +42,7 @@ export default function Dashboard() {
   useEffect(() => {
     const loadSocStats = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/statistics");
+        const res = await fetch("http://127.0.0.1:8001/incidents/statistics");
         const data = await res.json();
         console.log("AI SOC STATS:", data);
         setSocStats(data);
@@ -76,12 +76,12 @@ export default function Dashboard() {
   useEffect(() => {
   const loadHighPriority = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/high-priority");
+      const res = await fetch("http://127.0.0.1:8001/incidents/high-priority");
       const data = await res.json();
 
       console.log("HIGH PRIORITY CASES:", data);
 
-      setHighPriorityCases(data.cases || []);
+      setHighPriorityCases(Array.isArray(data) ? data : []);
     } catch (err) {
       console.log("Failed to load high priority cases:", err);
     }
@@ -96,7 +96,7 @@ export default function Dashboard() {
   try {
     const token = localStorage.getItem("token");
 
-    const res = await axios.get("https://golden-horizon-soc-backend.onrender.com/incidents", {
+    const res = await axios.get("http://127.0.0.1:8001/incidents", {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -289,9 +289,15 @@ const topAttackTypes = Object.entries(attackTypeCounts)
 
   return (
   <div style={styles.page}>
-    <h2 style={styles.title}>
-  Security Overview
-</h2>
+    <div style={styles.dashboardHeader}>
+      <h1 style={styles.mainTitle}>
+        Agentic AI Security Operations Platform
+      </h1>
+
+      <h2 style={styles.title}>
+        Security Overview
+      </h2>
+    </div>
 
     <div style={styles.statsGrid}>
       <div className="soc-kpi-card" style={styles.statCard}>
@@ -527,16 +533,34 @@ const topAttackTypes = Object.entries(attackTypeCounts)
 }
 const styles = {
  page: {
-  padding: "10px 12px",
-  background: "#0f172a",
+  padding: "22px 24px 28px",
+  background: "#08111f",
   minHeight: "100vh",
+  boxSizing: "border-box",
+},
+
+dashboardHeader: {
+  padding: "6px 0 20px",
+  marginBottom: "4px",
+  borderBottom: "1px solid #1e293b",
 },
 
 title: {
-  marginBottom: "8px",
-  color: "#f9fafb",
-  fontSize: "20px",
-  fontWeight: "600",
+  margin: "12px 0 0",
+  color: "#f8fafc",
+  fontSize: "22px",
+  fontWeight: "700",
+  lineHeight: 1.2,
+},
+
+mainTitle: {
+  margin: "0 0 8px 0",
+  textAlign: "center",
+  color: "#f8fafc",
+  fontSize: "28px",
+  fontWeight: 900,
+  letterSpacing: "0.3px",
+  lineHeight: 1.15,
 },
 
   center: {
@@ -551,23 +575,23 @@ title: {
 
   statsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-    gap: "10px",
-    marginBottom: "18px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(168px, 1fr))",
+    gap: "12px",
+    margin: "18px 0 20px",
   },
 
   statCard: {
-    background: "#111827",
-    color: "#f9fafb",
-    padding: "10px 12px",
+    background: "#0f172a",
+    color: "#f8fafc",
+    padding: "14px 16px",
     borderRadius: "8px",
-    border: "1px solid #263244",
-    boxShadow: "0 1px 2px rgba(0,0,0,0.24)",
+    border: "1px solid #334155",
+    boxShadow: "0 12px 28px rgba(0,0,0,0.18)",
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
     justifyContent: "center",
-    minHeight: "62px",
+    minHeight: "78px",
   },
 
   criticalCard: {
@@ -577,7 +601,7 @@ title: {
   borderRadius: "8px",
   fontWeight: "bold",
   fontSize: "14px",
-  border: "1px solid #263244",
+  border:"1px solid #334155",
   borderLeft: "3px solid #ef4444",
   boxShadow: "0 1px 2px rgba(0,0,0,0.24)",
 },
@@ -589,24 +613,24 @@ title: {
   borderRadius: "8px",
   fontWeight: "bold",
   fontSize: "14px",
-  border: "1px solid #263244",
+  border:"1px solid #334155",
   borderLeft: "3px solid #f97316",
   boxShadow: "0 1px 2px rgba(0,0,0,0.24)",
 },
  chartGrid: {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
-  gap: "10px",
-  marginBottom: "16px",
+  gap: "14px",
+  marginBottom: "18px",
 },
 
 chartBox: {
-  background: "#111827",
-  padding: "10px",
+  background: "#0f172a",
+  padding: "14px",
   borderRadius: "8px",
-  border: "1px solid #263244",
-  boxShadow: "0 1px 2px rgba(0,0,0,0.24)",
-  color: "#f9fafb",
+  border: "1px solid #334155",
+  boxShadow: "0 12px 28px rgba(0,0,0,0.18)",
+  color: "#f8fafc",
   minHeight: "260px",
 },
 
@@ -654,9 +678,9 @@ statusLegendDot: {
 
   filters: {
     display: "flex",
-    gap: "10px",
+    gap: "8px",
     flexWrap: "wrap",
-    marginBottom: "16px",
+    marginBottom: "18px",
   },
 
   filterBtn: {
@@ -678,12 +702,12 @@ statusLegendDot: {
 },
 
 card: {
-  background: "#111827",
-  color: "#f9fafb",
-  padding: "10px",
+  background: "#0f172a",
+  color: "#f8fafc",
+  padding: "12px 14px",
   borderRadius: "8px",
-  border: "1px solid #263244",
-  boxShadow: "0 1px 2px rgba(0,0,0,0.24)",
+  border: "1px solid #334155",
+  boxShadow: "0 10px 24px rgba(0,0,0,0.16)",
 
   display: "grid",
   gridTemplateColumns: "minmax(160px, 1.4fr) minmax(220px, 2fr) auto auto minmax(120px, auto)",
@@ -739,8 +763,9 @@ card: {
 
 panelTitle: {
   fontSize: "15px",
-  fontWeight: "600",
-  marginBottom: "8px",
+  fontWeight: "700",
+  margin: "0 0 12px",
+  color: "#f8fafc",
 },
 
 incidentTitle: {
@@ -759,11 +784,13 @@ incidentDesc: {
 
 statusText: {
   color: "#60a5fa",
+  whiteSpace: "nowrap",
 },
 
 dateText: {
   color: "#94a3b8",
   fontSize: "12px",
+  whiteSpace: "nowrap",
 },
 attackTypeRow: {
   display: "flex",
@@ -771,31 +798,33 @@ attackTypeRow: {
   alignItems: "center",
   padding: "8px 10px",
   marginBottom: "8px",
-  background: "#1e293b",
-  borderRadius: "10px",
+  background: "#111827",
+  borderRadius: "8px",
   border: "1px solid #334155",
   color: "#f8fafc",
 },
 statLabel: {
   fontSize: "12px",
   color: "#94a3b8",
-  fontWeight: "600",
+  fontWeight: "700",
+  textTransform: "uppercase",
+  letterSpacing: "0.5px",
 },
 
 statValue: {
-  marginTop: "4px",
-  fontSize: "24px",
+  marginTop: "8px",
+  fontSize: "28px",
   color: "#f8fafc",
-  fontWeight: "700",
+  fontWeight: "800",
   lineHeight: 1,
 },
 
 topSourceValue: {
   maxWidth: "100%",
-  marginTop: "4px",
+  marginTop: "8px",
   color: "#f8fafc",
-  fontSize: "22px",
-  fontWeight: "700",
+  fontSize: "24px",
+  fontWeight: "800",
   lineHeight: 1,
   overflow: "hidden",
   textOverflow: "ellipsis",

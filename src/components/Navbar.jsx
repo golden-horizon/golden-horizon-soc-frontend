@@ -27,8 +27,8 @@ export default function Navbar() {
         style={styles.logoIcon}
       />
       <div style={styles.logoCopy}>
-        <span style={styles.logoProduct}>SOC Platform</span>
-        <span style={styles.logoCompany}>by Golden Horizon</span>
+        <span style={styles.logoProduct}>Agentic AI Security</span>
+        <span style={styles.logoCompany}>Operations Platform</span>
       </div>
     </div>
 
@@ -122,32 +122,32 @@ const styles = {
   },
 
   logoIcon: {
-    width: "58px",
-    height: "38px",
-    objectFit: "contain",
-    borderRadius: "6px",
-    flexShrink: 0,
-  },
+  width: "64px",
+  height: "42px",
+  objectFit: "contain",
+  borderRadius: "6px",
+  flexShrink: 0,
+},
 
+logoProduct: {
+  color: "#f8fafc",
+  fontSize: "18px",
+  fontWeight: "800",
+  letterSpacing: "0.3px",
+  whiteSpace: "nowrap",
+},
+
+logoCompany: {
+  color: "#60a5fa",
+  fontSize: "12px",
+  fontWeight: "700",
+  letterSpacing: "0.5px",
+  whiteSpace: "nowrap",
+},
   logoCopy: {
     display: "flex",
     flexDirection: "column",
     lineHeight: 1.05,
-  },
-
-  logoCompany: {
-    color: "#d9b85f",
-    fontSize: "12px",
-    fontWeight: "700",
-    letterSpacing: "0.3px",
-    whiteSpace: "nowrap",
-  },
-
-  logoProduct: {
-    color: "#f8fafc",
-    fontSize: "18px",
-    fontWeight: "800",
-    whiteSpace: "nowrap",
   },
 
   links: {

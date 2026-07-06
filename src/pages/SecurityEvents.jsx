@@ -33,7 +33,7 @@ const getEventStatus = (event) => {
 
 const getEventSource = (event) => {
   const text = normalise(
-    `${event.event_type} ${event.category} ${event.endpoint} ${event.description}`
+    `${event.event_type} ${event.category || event.title}${event.endpoint} ${event.description}`
   );
 
   if (text.includes("sql") || text.includes("injection")) {
@@ -67,7 +67,7 @@ const getEventSource = (event) => {
 
 const getRecommendedActions = (event) => {
   const text = normalise(
-    `${event.event_type} ${event.category} ${event.description} ${event.mitre_technique}`
+    `${event.event_type} ${event.category || event.title} ${event.description} ${event.mitre_technique}`
   );
 
   if (text.includes("sql") || text.includes("injection")) {
@@ -107,7 +107,7 @@ const getRecommendedActions = (event) => {
 
 const getMitreTechniqueDisplay = (event) => {
   const text = normalise(
-    `${event.event_type} ${event.category} ${event.description} ${event.mitre_technique}`
+    `${event.event_type} ${event.category || event.title} ${event.description} ${event.mitre_technique}`
   );
 
   if (text.includes("api abuse")) {
@@ -263,7 +263,11 @@ export default function SecurityEvents() {
 
   const categoryData = useMemo(() => {
     const counts = events.reduce((acc, event) => {
-      const name = event.category || event.event_type || "Uncategorized";
+    const name =
+       event.category ||
+       event.title ||
+       event.event_type ||
+       "Uncategorized";
       acc[name] = (acc[name] || 0) + 1;
       return acc;
     }, {});
@@ -282,7 +286,7 @@ export default function SecurityEvents() {
       String(event.id).includes(searchValue) ||
       normalise(event.event_type).includes(searchValue) ||
       normalise(event.source_ip).includes(searchValue) ||
-      normalise(event.category).includes(searchValue) ||
+      normalise(event.category || event.title).includes(searchValue) ||
       normalise(event.mitre_technique).includes(searchValue) ||
       normalise(getMitreTechniqueDisplay(event)).includes(searchValue) ||
       normalise(eventStatus).includes(searchValue) ||
@@ -300,7 +304,9 @@ export default function SecurityEvents() {
 
     const loadEvents = async () => {
       try {
-        const res = await axios.get("https://golden-horizon-soc-backend.onrender.com/security-events");
+        const res = await axios.get(
+          "http://localhost:8001/incidents"
+        );
 
         if (isMounted) {
           setEvents(res.data || []);
@@ -469,7 +475,7 @@ export default function SecurityEvents() {
                 </span>
                 <span style={getStatusStyle(status)}>{status}</span>
                 <span>{event.source_ip || "N/A"}</span>
-                <span style={styles.wrapText}>{event.category || "N/A"}</span>
+                <span style={styles.wrapText}>{event.category || event.title || "N/A"}</span>
                 <span style={styles.wrapText}>
                   {getMitreTechniqueDisplay(event)}
                 </span>
@@ -536,7 +542,9 @@ export default function SecurityEvents() {
 
               <div style={styles.detailItem}>
                 <span>Category</span>
-                <strong>{selectedEvent.category || "N/A"}</strong>
+                <strong>
+                   {selectedEvent.category || selectedEvent.title || "N/A"}
+                </strong>
               </div>
 
               <div style={styles.detailItem}>
